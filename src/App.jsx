@@ -35,9 +35,7 @@ export default function App() {
 
   // --- UI State ---
   const [activeProject, setActiveProject] = useState(null);
-  const [currentView, setCurrentView] = useState('projects'); // 'projects', 'board', 'team', 'profile'
-  
-  // --- Modals & Overlays ---
+  const [currentView, setCurrentView] = useState('projects'); 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -51,7 +49,6 @@ export default function App() {
 
   // --- 1. INITIAL LOAD & PERSISTENCE ---
   useEffect(() => {
-    // Load User
     const savedUser = localStorage.getItem('jira_user');
     if (savedUser) { 
       setUser(JSON.parse(savedUser)); 
@@ -60,12 +57,10 @@ export default function App() {
       setLoading(false); 
     }
 
-    // Load Theme
     const savedTheme = localStorage.getItem('jira_theme');
     if (savedTheme === 'dark') setIsDarkMode(true);
   }, []);
 
-  // Save changes to LocalStorage
   useEffect(() => { if(tasks.length > 0) localStorage.setItem('jira_tasks', JSON.stringify(tasks)); }, [tasks]);
   useEffect(() => { localStorage.setItem('jira_projects', JSON.stringify(projects)); }, [projects]);
   useEffect(() => { localStorage.setItem('jira_columns', JSON.stringify(columns)); }, [columns]);
@@ -74,14 +69,11 @@ export default function App() {
   // --- 2. KEYBOARD SHORTCUTS ---
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Ctrl/Cmd + K (Search Focus)
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        // You can add id="search-input" to the input in Header.jsx to make this work perfectly
         const input = document.querySelector('input[type="text"]'); 
         if(input) input.focus();
       }
-      // Shift + N (New Task)
       if (e.shiftKey && e.key === 'N' && currentView === 'board') {
          e.preventDefault();
          setEditingTask(null);
@@ -107,7 +99,6 @@ export default function App() {
       setTasks(JSON.parse(savedTasks));
       setLoading(false);
     } else {
-      // Initialize with Dummy Data
       fetch(`${API_URL}/todos?limit=12&skip=3`)
         .then(res => res.json())
         .then(data => {
@@ -117,9 +108,10 @@ export default function App() {
             status: 'Todo',
             userId: t.userId,
             priority: ['High', 'Medium', 'Low'][Math.floor(Math.random() * 3)],
-            projectId: index % 2 === 0 ? 101 : 102, // Assign to default projects
+            projectId: index % 2 === 0 ? 101 : 102,
             dueDate: '', comments: [], tags: [], subtasks: [], 
-            assignee: null, attachments: [], history: [], isArchived: false
+            assignee: null, attachments: [], history: [], isArchived: false,
+            timeSpent: 0, timerStartTime: null // <--- Timer fields
           }));
           setTasks(formattedTasks);
           setLoading(false);
@@ -128,74 +120,34 @@ export default function App() {
   };
 
   // --- 4. AUTH HANDLERS ---
-  const handleLogin = (u) => { 
-    setUser(u); 
-    localStorage.setItem('jira_user', JSON.stringify(u)); 
-    loadData(); 
-    showToast(`Welcome back, ${u.firstName}!`, 'info');
-  };
-
-  const handleLogout = () => { 
-    setUser(null); 
-    localStorage.removeItem('jira_user'); 
-    setCurrentView('projects'); 
-    setActiveProject(null); 
-  };
+  const handleLogin = (u) => { setUser(u); localStorage.setItem('jira_user', JSON.stringify(u)); loadData(); };
+  const handleLogout = () => { setUser(null); localStorage.removeItem('jira_user'); setCurrentView('projects'); setActiveProject(null); };
 
   const handleUpdateUser = (updatedData) => {
     setUser(updatedData);
     localStorage.setItem('jira_user', JSON.stringify(updatedData));
-    
-    // Update local team cache so avatars update instantly
     setTeam(prev => prev.map(m => m.id === updatedData.id ? updatedData : m));
-    
-    // Update local storage signup record
-    const localUsers = JSON.parse(localStorage.getItem('jira_local_users') || '[]');
-    const newLocalUsers = localUsers.map(u => u.id === updatedData.id ? updatedData : u);
-    localStorage.setItem('jira_local_users', JSON.stringify(newLocalUsers));
-
     showToast('Profile updated', 'success');
   };
 
   // --- 5. PROJECT HANDLERS ---
   const handleSelectProject = (project) => { setActiveProject(project); setCurrentView('board'); };
-  
-  const handleSetView = (view) => {
-    if (view === 'projects') setActiveProject(null);
-    setCurrentView(view);
-  };
-
-  const handleAddProject = (project) => {
-    const newProject = { ...project, id: Date.now() };
-    setProjects([...projects, newProject]);
-    showToast(`Project "${project.name}" created`);
-  };
-
-  const handleDeleteProject = (projectId) => {
-    if(confirm('Delete project? All tasks will be deleted.')) {
-       setProjects(projects.filter(p => p.id !== projectId));
-       setTasks(tasks.filter(t => t.projectId !== projectId));
+  const handleSetView = (view) => { if (view === 'projects') setActiveProject(null); setCurrentView(view); };
+  const handleAddProject = (p) => { setProjects([...projects, { ...p, id: Date.now() }]); showToast(`Project created`); };
+  const handleDeleteProject = (pid) => {
+    if(confirm('Delete project?')) {
+       setProjects(projects.filter(p => p.id !== pid));
+       setTasks(tasks.filter(t => t.projectId !== pid));
        showToast('Project deleted', 'info');
     }
   };
 
   // --- 6. TASK CRUD HANDLERS ---
-  const createHistoryEntry = (action) => ({
-    id: Date.now(),
-    action,
-    user: { firstName: user.firstName, lastName: user.lastName },
-    timestamp: new Date().toLocaleString()
-  });
+  const createHistoryEntry = (action) => ({ id: Date.now(), action, user: { firstName: user.firstName }, timestamp: new Date().toLocaleString() });
 
   const handleSaveTask = (taskData) => {
     if (editingTask) {
-      setTasks(tasks.map(t => {
-        if (t.id === editingTask.id) {
-          const newHistory = [...(t.history || []), createHistoryEntry('Updated task')];
-          return { ...t, ...taskData, history: newHistory };
-        }
-        return t;
-      }));
+      setTasks(tasks.map(t => t.id === editingTask.id ? { ...t, ...taskData, history: [...(t.history || []), createHistoryEntry('Updated task')] } : t));
       showToast('Task updated');
     } else {
       const newTask = {
@@ -205,6 +157,7 @@ export default function App() {
         projectId: activeProject.id,
         ...taskData,
         isArchived: false,
+        timeSpent: 0, timerStartTime: null,
         history: [createHistoryEntry('Created task')]
       };
       setTasks([newTask, ...tasks]);
@@ -214,89 +167,66 @@ export default function App() {
     setEditingTask(null);
   };
 
+  // NEW: Toggle Timer Logic
+  const handleToggleTimer = (taskId) => {
+    setTasks(prev => prev.map(t => {
+      if (t.id === taskId) {
+        if (t.timerStartTime) {
+          // Stop
+          const elapsed = Date.now() - t.timerStartTime;
+          return { ...t, timeSpent: (t.timeSpent || 0) + elapsed, timerStartTime: null };
+        } else {
+          // Start
+          return { ...t, timerStartTime: Date.now() };
+        }
+      }
+      return t;
+    }));
+  };
+
   const handleQuickAddTask = (title, status) => {
     const newTask = {
-      id: Date.now(),
-      title,
-      status,
-      userId: user.id,
-      projectId: activeProject.id,
-      priority: 'Medium',
-      isArchived: false,
-      tags: [], comments: [], subtasks: [], assignee: null, attachments: [],
-      history: [createHistoryEntry('Quick Added')]
+      id: Date.now(), title, status, userId: user.id, projectId: activeProject.id, priority: 'Medium', isArchived: false,
+      tags: [], comments: [], subtasks: [], assignee: null, attachments: [], history: [createHistoryEntry('Quick Added')],
+      timeSpent: 0, timerStartTime: null
     };
     setTasks([newTask, ...tasks]);
     showToast('Task added');
   };
 
   const handleCloneTask = (task) => {
-    const cloned = { 
-      ...task, 
-      id: Date.now(), 
-      title: `${task.title} (Copy)`,
-      history: [...(task.history || []), createHistoryEntry(`Cloned from #${task.id}`)]
-    };
+    const cloned = { ...task, id: Date.now(), title: `${task.title} (Copy)`, history: [...(task.history || []), createHistoryEntry(`Cloned from #${task.id}`)] };
     setTasks([cloned, ...tasks]);
     showToast('Task cloned');
   };
 
-  const handleArchiveTask = (taskId) => {
-    if(confirm('Move to Trash?')) {
-      setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t));
-      showToast('Moved to Trash', 'info');
-    }
-  };
+  const handleArchiveTask = (taskId) => { if(confirm('Move to Trash?')) { setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t)); showToast('Moved to Trash', 'info'); }};
+  const handleRestoreTask = (taskId) => { setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: false } : t)); showToast('Task Restored'); };
+  const handlePermanentDelete = (taskId) => { if(confirm('Delete forever?')) { setTasks(tasks.filter(t => t.id !== taskId)); showToast('Deleted permanently', 'error'); }};
 
-  const handleRestoreTask = (taskId) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: false } : t));
-    showToast('Task Restored');
-  };
-
-  const handlePermanentDelete = (taskId) => {
-    if(confirm('Delete forever? This cannot be undone.')) {
-      setTasks(tasks.filter(t => t.id !== taskId));
-      showToast('Deleted permanently', 'error');
-    }
-  };
-
-  // --- 7. DRAG & DROP ---
   const onDragStart = (e, id) => e.dataTransfer.setData("taskId", id);
   const onDragOver = (e) => e.preventDefault();
   const onDrop = (e, targetStatus) => {
     const id = parseInt(e.dataTransfer.getData("taskId"));
     setTasks(prev => prev.map(task => {
       if (task.id === id && task.status !== targetStatus) {
-        // Confetti on Done
         if (targetStatus === 'Done') confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        
-        const newHistory = [...(task.history || []), createHistoryEntry(`Moved to ${targetStatus}`)];
-        return { ...task, status: targetStatus, history: newHistory };
+        return { ...task, status: targetStatus, history: [...(task.history || []), createHistoryEntry(`Moved to ${targetStatus}`)] };
       }
       return task;
     }));
   };
 
-  // --- 8. UTILITIES (Export/Import/Theme) ---
+  // --- 7. UTILITIES ---
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
-
-  const handleExportCSV = () => {
-    const rows = filteredTasks.map(t => [t.id, `"${t.title.replace(/"/g, '""')}"`, t.status, t.priority, t.dueDate || ""]);
-    const csvContent = ["ID,Title,Status,Priority,Due Date"].concat(rows.map(r => r.join(","))).join("\n");
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv' }));
-    link.download = `${activeProject?.key || 'Board'}_export.csv`;
-    link.click();
-  };
-
+  
   const handleExportJSON = () => {
-    const data = { tasks, projects, columns, version: 1.0 };
+    const data = { tasks, projects, columns };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
     link.download = `jira_backup_${Date.now()}.json`;
     link.click();
-    showToast('Backup downloaded');
   };
 
   const handleImportJSON = (e) => {
@@ -309,15 +239,21 @@ export default function App() {
         if (data.tasks) setTasks(data.tasks);
         if (data.projects) setProjects(data.projects);
         if (data.columns) setColumns(data.columns);
-        showToast('Data restored successfully', 'success');
-      } catch (err) {
-        showToast('Invalid JSON file', 'error');
-      }
+        showToast('Data restored', 'success');
+      } catch (err) { showToast('Invalid JSON', 'error'); }
     };
     reader.readAsText(file);
   };
 
-  // --- 9. FILTERING ---
+  const handleExportCSV = () => {
+    const rows = filteredTasks.map(t => [t.id, `"${t.title}"`, t.status, t.priority, t.dueDate || ""]);
+    const csvContent = ["ID,Title,Status,Priority,Due Date"].concat(rows.map(r => r.join(","))).join("\n");
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv' }));
+    link.download = `export.csv`;
+    link.click();
+  };
+
   const filteredTasks = tasks.filter(t => {
     if (t.isArchived) return false;
     if (!activeProject || t.projectId !== activeProject.id) return false;
@@ -328,93 +264,49 @@ export default function App() {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-      
-      {!user ? (
-        <LoginPage onLogin={handleLogin} />
-      ) : (
+      {!user ? <LoginPage onLogin={handleLogin} /> : (
         <>
-          {/* --- HEADER --- */}
           <Header 
             user={user} onLogout={handleLogout} onCreateClick={() => { setEditingTask(null); setIsModalOpen(true); }}
             searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             currentView={currentView} setView={handleSetView} activeProject={activeProject}
-            filterPriority={filterPriority} setFilterPriority={setFilterPriority}
-            onClearFilters={() => { setSearchQuery(''); setFilterPriority('All'); }}
+            filterPriority={filterPriority} setFilterPriority={setFilterPriority} onClearFilters={() => { setSearchQuery(''); setFilterPriority('All'); }}
             isDarkMode={isDarkMode} toggleDarkMode={toggleDarkMode}
             onExportJSON={handleExportJSON} onImportJSON={handleImportJSON} onExport={handleExportCSV}
           />
 
-          {/* --- TRASH TOGGLE (Fixed) --- */}
           <div className="fixed bottom-6 left-6 z-50">
-             <button 
-               onClick={() => setIsTrashOpen(true)}
-               className="bg-slate-800 text-white p-3 rounded-full shadow-lg hover:bg-slate-900 transition flex items-center gap-2 border border-slate-700"
-               title="Open Trash Bin"
-             >
-               <Trash2 size={20} />
-             </button>
+             <button onClick={() => setIsTrashOpen(true)} className="bg-slate-800 text-white p-3 rounded-full shadow-lg hover:bg-slate-900 border border-slate-700"><Trash2 size={20} /></button>
           </div>
 
-          {/* --- MAIN CONTENT --- */}
           <main className="flex-1 flex flex-col relative h-full">
-            
-            {/* VIEW: Projects Dashboard */}
             {currentView === 'projects' && (
-              <ProjectList 
-                projects={projects} 
-                tasks={tasks}
-                onSelectProject={handleSelectProject} 
-                onAddProject={handleAddProject} 
-                onDeleteProject={handleDeleteProject} 
-              />
+              <ProjectList projects={projects} tasks={tasks} onSelectProject={handleSelectProject} onAddProject={handleAddProject} onDeleteProject={handleDeleteProject} />
             )}
 
-            {/* VIEW: Task Board (Kanban/List) */}
             {currentView === 'board' && (
               <div className={`flex-1 flex flex-col relative h-full ${!isDarkMode && activeProject?.color ? activeProject.color.replace('bg-', 'bg-opacity-5 bg-') : ''}`}>
-                 {loading ? <div className="p-10 text-center text-slate-500">Loading board...</div> : (
+                 {loading ? <div className="p-10 text-center">Loading...</div> : (
                   <TaskBoard 
                     tasks={filteredTasks} columns={columns} user={user} isDarkMode={isDarkMode}
                     onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
-                    onDelete={handleArchiveTask} // Use Archive, not Delete
-                    onEdit={(t) => { setEditingTask(t); setIsModalOpen(true); }}
-                    onQuickAdd={handleQuickAddTask} 
-                    onClone={handleCloneTask}
-                    onAddColumn={(n) => setColumns([...columns, n])} 
-                    onDeleteColumn={(c) => setColumns(columns.filter(x=>x!==c))}
+                    onDelete={handleArchiveTask} onEdit={(t) => { setEditingTask(t); setIsModalOpen(true); }}
+                    onQuickAdd={handleQuickAddTask} onClone={handleCloneTask}
+                    onAddColumn={(n) => setColumns([...columns, n])} onDeleteColumn={(c) => setColumns(columns.filter(x=>x!==c))}
+                    onToggleTimer={handleToggleTimer} // <--- Passed prop
                   />
                  )}
               </div>
             )}
             
-            {/* VIEW: Team */}
             {currentView === 'team' && <TeamMembers />}
-            
-            {/* VIEW: Profile */}
-            {currentView === 'profile' && (
-              <UserProfile 
-                user={user} 
-                tasks={tasks} 
-                onUpdateUser={handleUpdateUser} 
-                isDarkMode={isDarkMode}
-              />
-            )}
+            {currentView === 'profile' && <UserProfile user={user} tasks={tasks} onUpdateUser={handleUpdateUser} isDarkMode={isDarkMode} />}
           </main>
 
           <Footer />
-          
-          {/* --- OVERLAYS --- */}
           {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-          
-          <TaskModal 
-            isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTask}
-            editingTask={editingTask} currentUser={user} team={team}
-          />
-
-          <TrashModal 
-            isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} 
-            tasks={tasks} onRestore={handleRestoreTask} onPermanentDelete={handlePermanentDelete} 
-          />
+          <TaskModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={handleSaveTask} editingTask={editingTask} currentUser={user} team={team} />
+          <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} tasks={tasks} onRestore={handleRestoreTask} onPermanentDelete={handlePermanentDelete} />
         </>
       )}
     </div>
