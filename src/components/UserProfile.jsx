@@ -1,70 +1,108 @@
-import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Briefcase, Save, Edit2, CheckCircle, Clock, Layout } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, MapPin, Briefcase, Save, Edit2, CheckCircle, Clock, Layout, Camera, User } from 'lucide-react';
 
-export default function UserProfile({ user, tasks, onUpdateUser }) {
+export default function UserProfile({ user, tasks, onUpdateUser, isDarkMode }) {
   const [isEditing, setIsEditing] = useState(false);
+  
+  // Local form state
   const [formData, setFormData] = useState({
-    firstName: user.firstName,
-    lastName: user.lastName,
-    email: user.email,
-    phone: user.phone,
-    company: user.company?.title || 'Unknown',
-    address: `${user.address?.address}, ${user.address?.city}`
+    firstName: '',
+    lastName: '',
+    email: '',
+    title: '',
+    image: '',
+    city: ''
   });
 
-  // Calculate User Stats
+  // Load user data into form on mount
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        email: user.email || '',
+        title: user.company?.title || 'Team Member',
+        image: user.image || '',
+        city: user.address?.city || 'Remote'
+      });
+    }
+  }, [user]);
+
+  // Calculate Stats
   const userTasks = tasks.filter(t => t.userId === user.id);
   const completed = userTasks.filter(t => t.status === 'Done').length;
-  const pending = userTasks.filter(t => t.status !== 'Done').length;
+  const pending = userTasks.length - completed;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = () => {
-    // In a real app, you would make a PUT request to the API here.
-    // For this clone, we update the local state immediately.
-    onUpdateUser({
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    // Create updated user object
+    const updatedUser = {
       ...user,
       firstName: formData.firstName,
       lastName: formData.lastName,
       email: formData.email,
-      phone: formData.phone,
-      company: { ...user.company, title: formData.company },
-      // Note: Address structure in dummyjson is complex, simplifying for demo
-    });
+      image: formData.image,
+      company: { ...user.company, title: formData.title },
+      address: { ...user.address, city: formData.city }
+    };
+    onUpdateUser(updatedUser);
     setIsEditing(false);
   };
 
+  const themeClasses = {
+    card: isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200',
+    text: isDarkMode ? 'text-slate-100' : 'text-slate-900',
+    subText: isDarkMode ? 'text-slate-400' : 'text-slate-500',
+    input: isDarkMode ? 'bg-slate-700 border-slate-600 text-white focus:ring-blue-500' : 'bg-slate-50 border-slate-200 text-slate-800 focus:ring-blue-200',
+    label: isDarkMode ? 'text-slate-300' : 'text-slate-600',
+  };
+
   return (
-    <div className="max-w-4xl mx-auto p-6 w-full">
-      {/* --- Header Section --- */}
-      <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden mb-6">
-        <div className="h-32 bg-gradient-to-r from-blue-600 to-blue-400"></div>
-        <div className="px-8 pb-8 relative flex flex-col sm:flex-row items-center sm:items-end gap-6">
-          <div className="-mt-16 relative">
+    <div className={`p-8 max-w-5xl mx-auto w-full animate-in fade-in slide-in-from-bottom-4`}>
+      
+      {/* --- HEADER CARD --- */}
+      <div className={`rounded-2xl shadow-sm border overflow-hidden mb-8 ${themeClasses.card}`}>
+        {/* Banner */}
+        <div className="h-32 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+        
+        <div className="px-8 pb-8 relative flex flex-col md:flex-row items-center md:items-end gap-6">
+          {/* Avatar */}
+          <div className="-mt-16 relative group">
             <img 
-              src={user.image} 
+              src={formData.image || 'https://via.placeholder.com/150'} 
               alt="Profile" 
-              className="w-32 h-32 rounded-full border-4 border-white bg-white shadow-md object-cover" 
+              className={`w-32 h-32 rounded-full border-4 shadow-md object-cover ${isDarkMode ? 'border-slate-800' : 'border-white'}`} 
             />
+            {isEditing && (
+              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition cursor-pointer">
+                <Camera className="text-white" />
+              </div>
+            )}
           </div>
           
-          <div className="flex-1 text-center sm:text-left mb-2">
-            <h1 className="text-2xl font-bold text-slate-800">
-              {user.firstName} {user.lastName}
+          {/* Name & Title */}
+          <div className="flex-1 text-center md:text-left mb-2">
+            <h1 className={`text-3xl font-bold ${themeClasses.text}`}>
+              {formData.firstName} {formData.lastName}
             </h1>
-            <p className="text-slate-500 font-medium flex items-center justify-center sm:justify-start gap-1">
-              <Briefcase size={16} /> {user.company?.title || 'Developer'}
+            <p className={`font-medium flex items-center justify-center md:justify-start gap-2 ${themeClasses.subText}`}>
+              <Briefcase size={16} /> {formData.title} 
+              <span className="mx-1">•</span>
+              <MapPin size={16} /> {formData.city}
             </p>
           </div>
 
+          {/* Edit Button */}
           <button 
-            onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition ${
+            onClick={() => isEditing ? handleSubmit({preventDefault:()=>{}}) : setIsEditing(true)}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold transition shadow-sm ${
               isEditing 
-                ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'bg-white border border-slate-300 text-slate-700 hover:bg-slate-50'
+                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                : (isDarkMode ? 'bg-slate-700 hover:bg-slate-600 text-white' : 'bg-white border border-slate-300 hover:bg-slate-50 text-slate-700')
             }`}
           >
             {isEditing ? <><Save size={18} /> Save Changes</> : <><Edit2 size={18} /> Edit Profile</>}
@@ -72,120 +110,112 @@ export default function UserProfile({ user, tasks, onUpdateUser }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* --- Left Column: Stats --- */}
+        {/* --- LEFT COL: STATS --- */}
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-            <h3 className="font-bold text-slate-700 mb-4 text-sm uppercase tracking-wider">Workload</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-blue-50 rounded-md">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 text-blue-600 rounded-full"><Layout size={18} /></div>
-                  <span className="text-sm font-medium text-slate-700">Total Tasks</span>
-                </div>
-                <span className="text-xl font-bold text-slate-800">{userTasks.length}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-green-50 rounded-md">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 text-green-600 rounded-full"><CheckCircle size={18} /></div>
-                  <span className="text-sm font-medium text-slate-700">Completed</span>
-                </div>
-                <span className="text-xl font-bold text-slate-800">{completed}</span>
-              </div>
-
-              <div className="flex items-center justify-between p-3 bg-orange-50 rounded-md">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 text-orange-600 rounded-full"><Clock size={18} /></div>
-                  <span className="text-sm font-medium text-slate-700">Pending</span>
-                </div>
-                <span className="text-xl font-bold text-slate-800">{pending}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* --- Right Column: Details Form --- */}
-        <div className="md:col-span-2">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200 h-full">
-            <h3 className="font-bold text-slate-700 mb-6 text-sm uppercase tracking-wider">Contact Information</h3>
+          <div className={`p-6 rounded-2xl shadow-sm border ${themeClasses.card}`}>
+            <h3 className={`font-bold text-sm uppercase tracking-wider mb-6 ${themeClasses.subText}`}>Performance</h3>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-500">First Name</label>
-                <input 
-                  type="text" 
-                  name="firstName"
-                  disabled={!isEditing}
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  className={`w-full p-2.5 rounded border ${isEditing ? 'border-blue-300 bg-white focus:ring-2 focus:ring-blue-200' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                />
+            <div className="space-y-4">
+              {/* Total */}
+              <div className={`flex items-center justify-between p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-blue-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-600 text-blue-400' : 'bg-blue-100 text-blue-600'}`}><Layout size={20} /></div>
+                  <span className={`font-semibold ${themeClasses.text}`}>Total Tasks</span>
+                </div>
+                <span className={`text-xl font-bold ${themeClasses.text}`}>{userTasks.length}</span>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-500">Last Name</label>
-                <input 
-                  type="text" 
-                  name="lastName"
-                  disabled={!isEditing}
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  className={`w-full p-2.5 rounded border ${isEditing ? 'border-blue-300 bg-white focus:ring-2 focus:ring-blue-200' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                />
+              {/* Completed */}
+              <div className={`flex items-center justify-between p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-emerald-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-600 text-emerald-400' : 'bg-emerald-100 text-emerald-600'}`}><CheckCircle size={20} /></div>
+                  <span className={`font-semibold ${themeClasses.text}`}>Completed</span>
+                </div>
+                <span className={`text-xl font-bold ${themeClasses.text}`}>{completed}</span>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-500 flex items-center gap-2"><Mail size={14}/> Email Address</label>
-                <input 
-                  type="email" 
-                  name="email"
-                  disabled={!isEditing}
-                  value={formData.email}
-                  onChange={handleChange}
-                  className={`w-full p-2.5 rounded border ${isEditing ? 'border-blue-300 bg-white focus:ring-2 focus:ring-blue-200' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-500 flex items-center gap-2"><Phone size={14}/> Phone Number</label>
-                <input 
-                  type="text" 
-                  name="phone"
-                  disabled={!isEditing}
-                  value={formData.phone}
-                  onChange={handleChange}
-                  className={`w-full p-2.5 rounded border ${isEditing ? 'border-blue-300 bg-white focus:ring-2 focus:ring-blue-200' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                />
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-semibold text-slate-500 flex items-center gap-2"><MapPin size={14}/> Address</label>
-                <input 
-                  type="text" 
-                  name="address"
-                  disabled={!isEditing}
-                  value={formData.address}
-                  onChange={handleChange}
-                  className={`w-full p-2.5 rounded border ${isEditing ? 'border-blue-300 bg-white focus:ring-2 focus:ring-blue-200' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                />
-              </div>
-
-              <div className="space-y-2 sm:col-span-2">
-                <label className="text-sm font-semibold text-slate-500 flex items-center gap-2"><Briefcase size={14}/> Job Title</label>
-                <input 
-                  type="text" 
-                  name="company"
-                  disabled={!isEditing}
-                  value={formData.company}
-                  onChange={handleChange}
-                  className={`w-full p-2.5 rounded border ${isEditing ? 'border-blue-300 bg-white focus:ring-2 focus:ring-blue-200' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
-                />
+              {/* Pending */}
+              <div className={`flex items-center justify-between p-4 rounded-xl ${isDarkMode ? 'bg-slate-700/50' : 'bg-orange-50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${isDarkMode ? 'bg-slate-600 text-orange-400' : 'bg-orange-100 text-orange-600'}`}><Clock size={20} /></div>
+                  <span className={`font-semibold ${themeClasses.text}`}>Pending</span>
+                </div>
+                <span className={`text-xl font-bold ${themeClasses.text}`}>{pending}</span>
               </div>
             </div>
           </div>
         </div>
+
+        {/* --- RIGHT COL: EDIT FORM --- */}
+        <div className="lg:col-span-2">
+          <div className={`p-6 rounded-2xl shadow-sm border h-full ${themeClasses.card}`}>
+            <h3 className={`font-bold text-sm uppercase tracking-wider mb-6 ${themeClasses.subText}`}>Personal Information</h3>
+            
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              <div className="space-y-2">
+                <label className={`text-sm font-bold ${themeClasses.label}`}>First Name</label>
+                <input 
+                  type="text" name="firstName" disabled={!isEditing}
+                  value={formData.firstName} onChange={handleChange}
+                  className={`w-full p-3 rounded-lg border outline-none transition ${themeClasses.input} ${!isEditing && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`text-sm font-bold ${themeClasses.label}`}>Last Name</label>
+                <input 
+                  type="text" name="lastName" disabled={!isEditing}
+                  value={formData.lastName} onChange={handleChange}
+                  className={`w-full p-3 rounded-lg border outline-none transition ${themeClasses.input} ${!isEditing && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className={`text-sm font-bold ${themeClasses.label} flex items-center gap-2`}><Mail size={14}/> Email Address</label>
+                <input 
+                  type="email" name="email" disabled={!isEditing}
+                  value={formData.email} onChange={handleChange}
+                  className={`w-full p-3 rounded-lg border outline-none transition ${themeClasses.input} ${!isEditing && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`text-sm font-bold ${themeClasses.label} flex items-center gap-2`}><Briefcase size={14}/> Job Title</label>
+                <input 
+                  type="text" name="title" disabled={!isEditing}
+                  value={formData.title} onChange={handleChange}
+                  className={`w-full p-3 rounded-lg border outline-none transition ${themeClasses.input} ${!isEditing && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className={`text-sm font-bold ${themeClasses.label} flex items-center gap-2`}><MapPin size={14}/> Location</label>
+                <input 
+                  type="text" name="city" disabled={!isEditing}
+                  value={formData.city} onChange={handleChange}
+                  className={`w-full p-3 rounded-lg border outline-none transition ${themeClasses.input} ${!isEditing && 'opacity-60 cursor-not-allowed'}`}
+                />
+              </div>
+
+              {isEditing && (
+                <div className="space-y-2 md:col-span-2">
+                   <label className={`text-sm font-bold ${themeClasses.label} flex items-center gap-2`}><Camera size={14}/> Avatar URL</label>
+                   <input 
+                    type="text" name="image"
+                    value={formData.image} onChange={handleChange}
+                    placeholder="https://example.com/my-photo.jpg"
+                    className={`w-full p-3 rounded-lg border outline-none transition ${themeClasses.input}`}
+                  />
+                  <p className="text-xs text-slate-400">Paste a direct image link to update your avatar.</p>
+                </div>
+              )}
+            </form>
+          </div>
+        </div>
+
       </div>
     </div>
   );

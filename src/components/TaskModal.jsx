@@ -101,7 +101,7 @@ export default function TaskModal({ isOpen, onClose, onSave, editingTask, curren
 
               {/* Tags */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                   <Tag size={14} /> Tags</label>
                 <div className="flex flex-wrap gap-2 p-2 border border-slate-300 rounded min-h-[42px]">
                   {tags.map(tag => (
@@ -114,7 +114,7 @@ export default function TaskModal({ isOpen, onClose, onSave, editingTask, curren
               {/* Attachments Section (NEW) */}
               <div className="bg-slate-50 p-4 rounded border border-slate-200">
                 <div className="flex justify-between items-center mb-3">
-                  <label className="block text-sm font-semibold text-slate-700 flex items-center gap-2"><Paperclip size={14} /> Attachments</label>
+                  <label className="text-sm font-semibold text-slate-700 flex items-center gap-2"><Paperclip size={14} /> Attachments</label>
                   <label className="cursor-pointer bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded text-xs font-bold text-slate-600 transition">
                     Upload
                     <input type="file" className="hidden" onChange={handleFileUpload} />
@@ -141,7 +141,7 @@ export default function TaskModal({ isOpen, onClose, onSave, editingTask, curren
 
               {/* Subtasks */}
               <div className="bg-slate-50 p-4 rounded border border-slate-200">
-                 <label className="block text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><CheckSquare size={14} /> Subtasks</label>
+                 <label className=" text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><CheckSquare size={14} /> Subtasks</label>
                  {subtasks.length > 0 && (
                    <div className="w-full bg-slate-200 rounded-full h-2 mb-3">
                      <div className="bg-blue-500 h-2 rounded-full transition-all duration-300" style={{ width: `${(subtasks.filter(s => s.completed).length / subtasks.length) * 100}%` }}></div>
