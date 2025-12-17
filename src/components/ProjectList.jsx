@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, ArrowRight, Trash2, PieChart } from 'lucide-react';
+import { Plus, ArrowRight, Trash2, PieChart, Edit } from 'lucide-react';
 
-export default function ProjectList({ projects, tasks, onSelectProject, onAddProject, onDeleteProject }) {
+export default function ProjectList({ projects, tasks, onSelectProject, onAddProject, onEditProject, onDeleteProject }) {
   const [isCreating, setIsCreating] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectKey, setNewProjectKey] = useState('');
   const [selectedColor, setSelectedColor] = useState('bg-blue-600');
@@ -17,14 +18,23 @@ export default function ProjectList({ projects, tasks, onSelectProject, onAddPro
     { name: 'Orange', class: 'bg-orange-600' },
   ];
 
+  const resetForm = () => {
+    setNewProjectName('');
+    setNewProjectKey('');
+    setSelectedColor('bg-blue-600');
+    setIsCreating(false);
+    setEditingProject(null);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (newProjectName && newProjectKey) {
-      onAddProject({ name: newProjectName, key: newProjectKey, color: selectedColor });
-      setNewProjectName('');
-      setNewProjectKey('');
-      setSelectedColor('bg-blue-600');
-      setIsCreating(false);
+      if (editingProject) {
+        onEditProject({ id: editingProject.id, name: newProjectName, key: newProjectKey, color: selectedColor });
+      } else {
+        onAddProject({ name: newProjectName, key: newProjectKey, color: selectedColor });
+      }
+      resetForm();
     }
   };
 
@@ -41,20 +51,20 @@ export default function ProjectList({ projects, tasks, onSelectProject, onAddPro
     <div className="p-8 max-w-7xl mx-auto w-full">
       <div className="flex justify-between items-center mb-8">
         <div>
-           <h2 className="text-3xl font-bold text-slate-800">Projects</h2>
-           <p className="text-slate-500 mt-1">Manage your workstreams</p>
+          <h2 className="text-3xl font-bold text-slate-800">Projects</h2>
+          <p className="text-slate-500 mt-1">Manage your workstreams</p>
         </div>
-        <button 
-          onClick={() => setIsCreating(true)}
+        <button
+          onClick={() => { setEditingProject(null); setNewProjectName(''); setNewProjectKey(''); setSelectedColor('bg-blue-600'); setIsCreating(true); }}
           className="bg-blue-600 text-white px-4 py-2 rounded-md font-medium flex items-center gap-2 hover:bg-blue-700 transition shadow-sm"
         >
           <Plus size={20} /> Create Project
         </button>
       </div>
-      
+
       {isCreating && (
         <div className="mb-8 bg-white p-6 rounded-lg shadow-lg border border-blue-100 animate-in fade-in slide-in-from-top-4">
-          <h3 className="font-bold text-lg mb-4">New Project</h3>
+          <h3 className="font-bold text-lg mb-4">{editingProject ? 'Edit Project' : 'New Project'}</h3>
           <form onSubmit={handleSubmit} className="flex flex-col md:flex-row gap-4 items-end">
             <div className="flex-1 w-full">
               <label className="block text-sm font-bold text-slate-700 mb-1">Name</label>
@@ -66,21 +76,21 @@ export default function ProjectList({ projects, tasks, onSelectProject, onAddPro
             </div>
             {/* Color Picker */}
             <div className="w-full md:w-auto">
-               <label className="block text-sm font-bold text-slate-700 mb-1">Theme</label>
-               <div className="flex gap-2">
-                 {colors.map(c => (
-                   <button 
-                     key={c.name} type="button"
-                     onClick={() => setSelectedColor(c.class)}
-                     className={`w-9 h-9 rounded-full ${c.class} ${selectedColor === c.class ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'opacity-70 hover:opacity-100'} transition`}
-                     title={c.name}
-                   />
-                 ))}
-               </div>
+              <label className="block text-sm font-bold text-slate-700 mb-1">Theme</label>
+              <div className="flex gap-2">
+                {colors.map(c => (
+                  <button
+                    key={c.name} type="button"
+                    onClick={() => setSelectedColor(c.class)}
+                    className={`w-9 h-9 rounded-full ${c.class} ${selectedColor === c.class ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'opacity-70 hover:opacity-100'} transition`}
+                    title={c.name}
+                  />
+                ))}
+              </div>
             </div>
             <div className="flex gap-2 w-full md:w-auto">
-              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">Create</button>
-              <button type="button" onClick={() => setIsCreating(false)} className="bg-slate-100 text-slate-600 px-4 py-2 rounded font-bold hover:bg-slate-200">Cancel</button>
+              <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded font-bold hover:bg-blue-700">{editingProject ? 'Save Changes' : 'Create'}</button>
+              <button type="button" onClick={resetForm} className="bg-slate-100 text-slate-600 px-4 py-2 rounded font-bold hover:bg-slate-200">Cancel</button>
             </div>
           </form>
         </div>
@@ -92,51 +102,57 @@ export default function ProjectList({ projects, tasks, onSelectProject, onAddPro
           const themeColor = project.color || 'bg-blue-600';
 
           return (
-            <div 
-              key={project.id} 
+            <div
+              key={project.id}
               className="group bg-white rounded-xl shadow-sm border border-slate-200 hover:shadow-lg transition-all cursor-pointer relative overflow-hidden"
               onClick={() => onSelectProject(project)}
             >
               <div className={`h-3 w-full ${themeColor}`}></div>
               <div className="p-6">
-                 <div className="flex justify-between items-start mb-4">
-                   <div className={`w-12 h-12 rounded-lg ${themeColor} bg-opacity-10 flex items-center justify-center text-slate-700 font-bold text-xl shadow-sm border border-slate-100`}>
-                     {project.key[0]}
-                   </div>
-                   <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
-                        className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                   </div>
-                 </div>
-                 
-                 <h3 className="text-xl font-bold text-slate-800 mb-1">{project.name}</h3>
-                 <p className="text-sm text-slate-500 font-medium mb-4">Key: {project.key}</p>
+                <div className="flex justify-between items-start mb-4">
+                  <div className={`w-12 h-12 rounded-lg ${themeColor} bg-opacity-10 flex items-center justify-center text-slate-700 font-bold text-xl shadow-sm border border-slate-100`}>
+                    {project.key[0]}
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setEditingProject(project); setNewProjectName(project.name); setNewProjectKey(project.key); setSelectedColor(project.color || 'bg-blue-600'); setIsCreating(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-full"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteProject(project.id); }}
+                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
 
-                 {/* Analytics Bar */}
-                 <div className="mb-6">
-                   <div className="flex justify-between text-xs font-semibold text-slate-500 mb-1">
-                     <span>Progress</span>
-                     <span>{stats.percent}%</span>
-                   </div>
-                   <div className="w-full bg-slate-100 rounded-full h-2">
-                     <div 
-                       className={`h-2 rounded-full transition-all duration-500 ${themeColor}`} 
-                       style={{ width: `${stats.percent}%` }}
-                     ></div>
-                   </div>
-                   <div className="mt-2 text-xs text-slate-400 flex gap-4">
-                     <span className="flex items-center gap-1"><PieChart size={12}/> {stats.done} Done</span>
-                     <span>{stats.total - stats.done} Remaining</span>
-                   </div>
-                 </div>
-                 
-                 <div className="flex items-center text-blue-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
-                   Open Board <ArrowRight size={16} className="ml-1" />
-                 </div>
+                <h3 className="text-xl font-bold text-slate-800 mb-1">{project.name}</h3>
+                <p className="text-sm text-slate-500 font-medium mb-4">Key: {project.key}</p>
+
+                {/* Analytics Bar */}
+                <div className="mb-6">
+                  <div className="flex justify-between text-xs font-semibold text-slate-500 mb-1">
+                    <span>Progress</span>
+                    <span>{stats.percent}%</span>
+                  </div>
+                  <div className="w-full bg-slate-100 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500 ${themeColor}`}
+                      style={{ width: `${stats.percent}%` }}
+                    ></div>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400 flex gap-4">
+                    <span className="flex items-center gap-1"><PieChart size={12} /> {stats.done} Done</span>
+                    <span>{stats.total - stats.done} Remaining</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center text-blue-600 font-semibold text-sm group-hover:translate-x-1 transition-transform">
+                  Open Board <ArrowRight size={16} className="ml-1" />
+                </div>
               </div>
             </div>
           );

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import TaskCard from './TaskCard';
-import { Plus, X, Trash2, LayoutGrid, List, Calendar as CalendarIcon, ArrowDownUp, AlertOctagon } from 'lucide-react';
+import { Plus, X, Trash2, LayoutGrid, List, Calendar as CalendarIcon, ArrowDownUp, AlertOctagon, ChevronLeft, ChevronRight, Edit2, Check } from 'lucide-react';
 
-export default function TaskBoard({ 
-  tasks, columns, user, onDragStart, onDrop, onDragOver, 
-  onDelete, onEdit, onQuickAdd, onAddColumn, onDeleteColumn, onClone, isDarkMode, onToggleTimer 
+export default function TaskBoard({
+  tasks, columns, user, onDragStart, onDrop, onDragOver,
+  onDelete, onEdit, onQuickAdd, onAddColumn, onDeleteColumn, onMoveColumn, onRenameColumn, onClone, isDarkMode, onToggleTimer
 }) {
   const [viewMode, setViewMode] = useState('board');
   const [sortBy, setSortBy] = useState('default');
@@ -12,6 +12,13 @@ export default function TaskBoard({
   const [quickTitle, setQuickTitle] = useState('');
   const [newColName, setNewColName] = useState('');
   const [isAddingCol, setIsAddingCol] = useState(false);
+
+  // Renaming State
+  const [renamingCol, setRenamingCol] = useState(null);
+  const [renameInput, setRenameInput] = useState('');
+
+  const startRenaming = (col) => { setRenamingCol(col); setRenameInput(col); };
+  const submitRename = () => { if (renamingCol && renameInput) { onRenameColumn(renamingCol, renameInput); setRenamingCol(null); } };
 
   const WIP_LIMIT = 5;
 
@@ -55,7 +62,7 @@ export default function TaskBoard({
               <div key={t.id} onClick={() => onEdit(t)} className={`text-[10px] px-1 py-1 rounded truncate cursor-pointer font-medium ${isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'}`}>{t.title}</div>
             ))}
           </div>
-          <button onClick={() => onQuickAdd("New Event", columns[0])} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500"><Plus size={14}/></button>
+          <button onClick={() => onQuickAdd("New Event", columns[0])} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500"><Plus size={14} /></button>
         </div>
       );
     }
@@ -67,10 +74,10 @@ export default function TaskBoard({
           <div className="text-sm text-slate-500">Scheduled Tasks</div>
         </div>
         <div className="grid grid-cols-7 gap-0 border rounded-lg overflow-hidden shadow-sm">
-           {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d => (
-             <div key={d} className={`p-2 text-center text-xs font-bold uppercase ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-500 border-b border-slate-200'}`}>{d}</div>
-           ))}
-           {days}
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
+            <div key={d} className={`p-2 text-center text-xs font-bold uppercase ${isDarkMode ? 'bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 text-slate-500 border-b border-slate-200'}`}>{d}</div>
+          ))}
+          {days}
         </div>
       </div>
     );
@@ -82,7 +89,7 @@ export default function TaskBoard({
 
   return (
     <div className={`flex-1 flex flex-col overflow-hidden h-full transition-colors duration-300 ${isDarkMode ? 'bg-slate-900' : 'bg-slate-50'}`}>
-      
+
       {/* View Switcher */}
       <div className={`px-6 py-3 border-b flex justify-between items-center z-10 ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200 shadow-sm'}`}>
         <div className="flex gap-4 items-center">
@@ -98,7 +105,7 @@ export default function TaskBoard({
               <ArrowDownUp size={14} /> Sort: <span className="capitalize">{sortBy}</span>
             </button>
             <div className={`absolute left-0 top-full mt-1 w-32 rounded-md shadow-lg border hidden group-hover:block z-20 ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
-               {['default', 'priority', 'date'].map(s => (<button key={s} onClick={() => setSortBy(s)} className={`block w-full text-left px-4 py-2 text-xs capitalize ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'}`}>{s}</button>))}
+              {['default', 'priority', 'date'].map(s => (<button key={s} onClick={() => setSortBy(s)} className={`block w-full text-left px-4 py-2 text-xs capitalize ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'}`}>{s}</button>))}
             </div>
           </div>
         </div>
@@ -115,16 +122,32 @@ export default function TaskBoard({
               const isOverLimit = colTasks.length > WIP_LIMIT;
               return (
                 <div key={col} className={`min-w-[300px] w-[350px] rounded-lg p-3 flex flex-col max-h-full border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} ${isOverLimit ? 'border-red-400 ring-1 ring-red-400' : ''}`} onDragOver={onDragOver} onDrop={(e) => onDrop(e, col)}>
-                  <div className="flex justify-between items-center mb-4 px-2">
-                    <span className={`font-semibold text-sm uppercase flex items-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{col} <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isOverLimit ? 'bg-red-100 text-red-600' : (isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-300 text-slate-700')}`}>{colTasks.length}</span>{isOverLimit && <AlertOctagon size={14} className="text-red-500"/>}</span>
-                    {columns.length > 1 && <button onClick={() => onDeleteColumn(col)} className="text-slate-400 hover:text-red-500"><Trash2 size={16}/></button>}
+                  {/* Column Header */}
+                  <div className="flex justify-between items-center mb-4 px-2 group/header">
+                    {renamingCol === col ? (
+                      <div className="flex items-center gap-2 flex-1">
+                        <input autoFocus type="text" className={`w-full p-1 text-sm border rounded ${isDarkMode ? 'bg-slate-700 text-white border-slate-600' : 'bg-white border-blue-300'}`} value={renameInput} onChange={(e) => setRenameInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submitRename()} onBlur={submitRename} />
+                        <button onClick={submitRename} className="text-green-600 hover:bg-green-100 p-1 rounded"><Check size={14} /></button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <span className={`font-semibold text-sm uppercase flex items-center gap-2 ${isDarkMode ? 'text-slate-400' : 'text-slate-600'}`}>{col} <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isOverLimit ? 'bg-red-100 text-red-600' : (isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-300 text-slate-700')}`}>{colTasks.length}</span>{isOverLimit && <AlertOctagon size={14} className="text-red-500" />}</span>
+                        <button onClick={() => startRenaming(col)} className="opacity-0 group-hover/header:opacity-100 text-slate-400 hover:text-blue-500 transition-opacity"><Edit2 size={12} /></button>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
+                      <button onClick={() => onMoveColumn(col, 'left')} disabled={columns.indexOf(col) === 0} className="p-1 hover:bg-slate-200 rounded disabled:opacity-20"><ChevronLeft size={14} className={isDarkMode ? 'text-slate-400' : 'text-slate-600'} /></button>
+                      <button onClick={() => onMoveColumn(col, 'right')} disabled={columns.indexOf(col) === columns.length - 1} className="p-1 hover:bg-slate-200 rounded disabled:opacity-20"><ChevronRight size={14} className={isDarkMode ? 'text-slate-400' : 'text-slate-600'} /></button>
+                      {columns.length > 1 && <button onClick={() => onDeleteColumn(col)} className="p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded"><Trash2 size={14} /></button>}
+                    </div>
                   </div>
                   <div className="flex-1 overflow-y-auto min-h-[50px] pr-1 custom-scrollbar">
                     {colTasks.map(task => (<TaskCard key={task.id} task={task} user={user} onDragStart={onDragStart} onDelete={onDelete} onEdit={onEdit} onClone={onClone} isDarkMode={isDarkMode} onToggleTimer={onToggleTimer} />))}
                   </div>
                   {activeCol === col ? (
                     <div className={`mt-2 p-2 rounded shadow-sm border ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-blue-300'}`}>
-                      <textarea autoFocus placeholder="Title..." className={`w-full text-sm resize-none outline-none ${isDarkMode ? 'bg-slate-700 text-white' : 'text-slate-700'}`} rows={2} value={quickTitle} onChange={(e) => setQuickTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleQuickSubmit(col)}/>
+                      <textarea autoFocus placeholder="Title..." className={`w-full text-sm resize-none outline-none ${isDarkMode ? 'bg-slate-700 text-white' : 'text-slate-700'}`} rows={2} value={quickTitle} onChange={(e) => setQuickTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleQuickSubmit(col)} />
                       <button onClick={() => handleQuickSubmit(col)} className="bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded mt-2">Add</button>
                     </div>
                   ) : (
@@ -134,14 +157,14 @@ export default function TaskBoard({
               );
             })}
             <div className="min-w-[300px]">
-               {isAddingCol ? (
-                <form onSubmit={(e) => { e.preventDefault(); if(newColName.trim()){onAddColumn(newColName); setNewColName(''); setIsAddingCol(false)} }} className={`p-3 rounded-lg border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
-                  <input autoFocus type="text" placeholder="Column Name..." className={`w-full p-2 text-sm border rounded mb-2 ${isDarkMode ? 'bg-slate-700 border-slate-600 text-white' : 'border-slate-300'}`} value={newColName} onChange={(e) => setNewColName(e.target.value)}/>
+              {isAddingCol ? (
+                <form onSubmit={(e) => { e.preventDefault(); if (newColName.trim()) { onAddColumn(newColName); setNewColName(''); setIsAddingCol(false) } }} className={`p-3 rounded-lg border ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+                  <input autoFocus type="text" placeholder="Column Name..." className={`w-full p-2 text-sm border rounded mb-2 ${isDarkMode ? 'bg-slate-700 border-slate-600 text-white' : 'border-slate-300'}`} value={newColName} onChange={(e) => setNewColName(e.target.value)} />
                   <button type="submit" className="bg-blue-600 text-white text-sm font-bold px-3 py-1.5 rounded">Add</button>
                 </form>
-               ) : (
+              ) : (
                 <button onClick={() => setIsAddingCol(true)} className={`w-full p-3 rounded-lg flex items-center gap-2 font-bold border-2 border-dashed ${isDarkMode ? 'bg-slate-800 hover:bg-slate-800 text-slate-400 border-slate-700' : 'bg-slate-100 hover:bg-slate-100 text-slate-500 border-slate-200'}`}><Plus size={20} /> Add Column</button>
-               )}
+              )}
             </div>
           </div>
         </div>

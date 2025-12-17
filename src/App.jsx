@@ -35,7 +35,7 @@ export default function App() {
 
   // --- UI State ---
   const [activeProject, setActiveProject] = useState(null);
-  const [currentView, setCurrentView] = useState('projects'); 
+  const [currentView, setCurrentView] = useState('projects');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -50,20 +50,20 @@ export default function App() {
   // --- 1. INITIAL LOAD & PERSISTENCE ---
   useEffect(() => {
     const savedUser = localStorage.getItem('jira_user');
-    if (savedUser) { 
-      setUser(JSON.parse(savedUser)); 
-      loadData(); 
-    } else { 
-      setLoading(false); 
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+      loadData();
+    } else {
+      setLoading(false);
     }
 
     const savedTheme = localStorage.getItem('jira_theme');
     if (savedTheme === 'dark') setIsDarkMode(true);
   }, []);
 
-  useEffect(() => { if(tasks.length > 0) localStorage.setItem('jira_tasks', JSON.stringify(tasks)); }, [tasks]);
-  useEffect(() => { localStorage.setItem('jira_projects', JSON.stringify(projects)); }, [projects]);
-  useEffect(() => { localStorage.setItem('jira_columns', JSON.stringify(columns)); }, [columns]);
+  useEffect(() => { if (!loading) localStorage.setItem('jira_tasks', JSON.stringify(tasks)); }, [tasks, loading]);
+  useEffect(() => { if (!loading) localStorage.setItem('jira_projects', JSON.stringify(projects)); }, [projects, loading]);
+  useEffect(() => { if (!loading) localStorage.setItem('jira_columns', JSON.stringify(columns)); }, [columns, loading]);
   useEffect(() => { localStorage.setItem('jira_theme', isDarkMode ? 'dark' : 'light'); }, [isDarkMode]);
 
   // --- 2. KEYBOARD SHORTCUTS ---
@@ -71,13 +71,13 @@ export default function App() {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        const input = document.querySelector('input[type="text"]'); 
-        if(input) input.focus();
+        const input = document.querySelector('input[type="text"]');
+        if (input) input.focus();
       }
       if (e.shiftKey && e.key === 'N' && currentView === 'board') {
-         e.preventDefault();
-         setEditingTask(null);
-         setIsModalOpen(true);
+        e.preventDefault();
+        setEditingTask(null);
+        setIsModalOpen(true);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -109,7 +109,7 @@ export default function App() {
             userId: t.userId,
             priority: ['High', 'Medium', 'Low'][Math.floor(Math.random() * 3)],
             projectId: index % 2 === 0 ? 101 : 102,
-            dueDate: '', comments: [], tags: [], subtasks: [], 
+            dueDate: '', comments: [], tags: [], subtasks: [],
             assignee: null, attachments: [], history: [], isArchived: false,
             timeSpent: 0, timerStartTime: null // <--- Timer fields
           }));
@@ -134,12 +134,35 @@ export default function App() {
   const handleSelectProject = (project) => { setActiveProject(project); setCurrentView('board'); };
   const handleSetView = (view) => { if (view === 'projects') setActiveProject(null); setCurrentView(view); };
   const handleAddProject = (p) => { setProjects([...projects, { ...p, id: Date.now() }]); showToast(`Project created`); };
+  const handleEditProject = (p) => {
+    setProjects(projects.map(project => project.id === p.id ? { ...project, ...p } : project));
+    showToast('Project updated');
+  };
   const handleDeleteProject = (pid) => {
-    if(confirm('Delete project?')) {
-       setProjects(projects.filter(p => p.id !== pid));
-       setTasks(tasks.filter(t => t.projectId !== pid));
-       showToast('Project deleted', 'info');
+    if (confirm('Delete project?')) {
+      setProjects(projects.filter(p => p.id !== pid));
+      setTasks(tasks.filter(t => t.projectId !== pid));
+      showToast('Project deleted', 'info');
     }
+  };
+
+  const handleMoveColumn = (col, direction) => {
+    const idx = columns.indexOf(col);
+    if (idx === -1) return;
+    const newCols = [...columns];
+    const swapIdx = direction === 'left' ? idx - 1 : idx + 1;
+    if (swapIdx >= 0 && swapIdx < newCols.length) {
+      [newCols[idx], newCols[swapIdx]] = [newCols[swapIdx], newCols[idx]];
+      setColumns(newCols);
+    }
+  };
+
+  const handleRenameColumn = (oldName, newName) => {
+    if (!newName.trim()) return;
+    if (columns.includes(newName)) { showToast('Column name exists', 'error'); return; }
+    setColumns(columns.map(c => c === oldName ? newName : c));
+    setTasks(tasks.map(t => t.status === oldName ? { ...t, status: newName } : t));
+    showToast('Column renamed');
   };
 
   // --- 6. TASK CRUD HANDLERS ---
@@ -200,9 +223,9 @@ export default function App() {
     showToast('Task cloned');
   };
 
-  const handleArchiveTask = (taskId) => { if(confirm('Move to Trash?')) { setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t)); showToast('Moved to Trash', 'info'); }};
+  const handleArchiveTask = (taskId) => { if (confirm('Move to Trash?')) { setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: true } : t)); showToast('Moved to Trash', 'info'); } };
   const handleRestoreTask = (taskId) => { setTasks(tasks.map(t => t.id === taskId ? { ...t, isArchived: false } : t)); showToast('Task Restored'); };
-  const handlePermanentDelete = (taskId) => { if(confirm('Delete forever?')) { setTasks(tasks.filter(t => t.id !== taskId)); showToast('Deleted permanently', 'error'); }};
+  const handlePermanentDelete = (taskId) => { if (confirm('Delete forever?')) { setTasks(tasks.filter(t => t.id !== taskId)); showToast('Deleted permanently', 'error'); } };
 
   const onDragStart = (e, id) => e.dataTransfer.setData("taskId", id);
   const onDragOver = (e) => e.preventDefault();
@@ -219,7 +242,7 @@ export default function App() {
 
   // --- 7. UTILITIES ---
   const toggleDarkMode = () => setIsDarkMode(!isDarkMode);
-  
+
   const handleExportJSON = () => {
     const data = { tasks, projects, columns };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -266,7 +289,7 @@ export default function App() {
     <div className={`min-h-screen flex flex-col font-sans transition-colors duration-300 ${isDarkMode ? 'bg-slate-900 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
       {!user ? <LoginPage onLogin={handleLogin} /> : (
         <>
-          <Header 
+          <Header
             user={user} onLogout={handleLogout} onCreateClick={() => { setEditingTask(null); setIsModalOpen(true); }}
             searchQuery={searchQuery} setSearchQuery={setSearchQuery}
             currentView={currentView} setView={handleSetView} activeProject={activeProject}
@@ -276,29 +299,37 @@ export default function App() {
           />
 
           <div className="fixed bottom-6 left-6 z-50">
-             <button onClick={() => setIsTrashOpen(true)} className="bg-slate-800 text-white p-3 rounded-full shadow-lg hover:bg-slate-900 border border-slate-700"><Trash2 size={20} /></button>
+            <button onClick={() => setIsTrashOpen(true)} className="bg-slate-800 text-white p-3 rounded-full shadow-lg hover:bg-slate-900 border border-slate-700"><Trash2 size={20} /></button>
           </div>
 
           <main className="flex-1 flex flex-col relative h-full">
             {currentView === 'projects' && (
-              <ProjectList projects={projects} tasks={tasks} onSelectProject={handleSelectProject} onAddProject={handleAddProject} onDeleteProject={handleDeleteProject} />
+              <ProjectList
+                projects={projects}
+                tasks={tasks}
+                onSelectProject={handleSelectProject}
+                onAddProject={handleAddProject}
+                onEditProject={handleEditProject}
+                onDeleteProject={handleDeleteProject}
+              />
             )}
 
             {currentView === 'board' && (
               <div className={`flex-1 flex flex-col relative h-full ${!isDarkMode && activeProject?.color ? activeProject.color.replace('bg-', 'bg-opacity-5 bg-') : ''}`}>
-                 {loading ? <div className="p-10 text-center">Loading...</div> : (
-                  <TaskBoard 
+                {loading ? <div className="p-10 text-center">Loading...</div> : (
+                  <TaskBoard
                     tasks={filteredTasks} columns={columns} user={user} isDarkMode={isDarkMode}
                     onDragStart={onDragStart} onDragOver={onDragOver} onDrop={onDrop}
                     onDelete={handleArchiveTask} onEdit={(t) => { setEditingTask(t); setIsModalOpen(true); }}
                     onQuickAdd={handleQuickAddTask} onClone={handleCloneTask}
-                    onAddColumn={(n) => setColumns([...columns, n])} onDeleteColumn={(c) => setColumns(columns.filter(x=>x!==c))}
+                    onAddColumn={(n) => setColumns([...columns, n])} onDeleteColumn={(c) => setColumns(columns.filter(x => x !== c))}
+                    onMoveColumn={handleMoveColumn} onRenameColumn={handleRenameColumn}
                     onToggleTimer={handleToggleTimer} // <--- Passed prop
                   />
-                 )}
+                )}
               </div>
             )}
-            
+
             {currentView === 'team' && <TeamMembers />}
             {currentView === 'profile' && <UserProfile user={user} tasks={tasks} onUpdateUser={handleUpdateUser} isDarkMode={isDarkMode} />}
           </main>
