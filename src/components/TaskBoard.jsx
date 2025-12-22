@@ -22,6 +22,51 @@ export default function TaskBoard({
 
   const WIP_LIMIT = 5;
 
+  // Filters & local wrappers for handlers (provide safe fallbacks)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterPriority, setFilterPriority] = useState('all');
+  const [showOnlyMine, setShowOnlyMine] = useState(false);
+
+  const handleAddTask = (title, col) => {
+    if (onQuickAdd) return onQuickAdd(title, col);
+    console.warn('onQuickAdd not provided. Title:', title, 'col:', col);
+  };
+
+  const handleEditTask = (task) => {
+    if (onEdit) return onEdit(task);
+    console.warn('onEdit not provided', task);
+  };
+
+  const handleDeleteTask = (id) => {
+    if (onDelete) return onDelete(id);
+    console.warn('onDelete not provided', id);
+  };
+
+  const handleToggleTimer = (taskId) => {
+    if (onToggleTimer) return onToggleTimer(taskId);
+    console.warn('onToggleTimer not provided', taskId);
+  };
+
+  const handleMoveTask = (taskId, toCol) => {
+    // Best-effort wrapper: actual move should be done via drag/drop (onDrop)
+    if (onDrop) {
+      console.warn('handleMoveTask: prefer using drag events; onDrop exists for handling moves.');
+    } else {
+      console.warn('No move handler provided for', taskId, '->', toCol);
+    }
+  };
+
+  const applyFilters = (taskList) => {
+    return (taskList || []).filter(t => {
+      if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      if (filterPriority !== 'all' && t.priority !== filterPriority) return false;
+      if (showOnlyMine && (!t.assignee || (user && t.assignee.id !== user.id))) return false;
+      return true;
+    });
+  };
+
+  const visibleTasks = applyFilters(tasks);
+
   // Sorting
   const getSortedTasks = (taskList) => {
     if (sortBy === 'default') return taskList;
@@ -52,17 +97,17 @@ export default function TaskBoard({
     }
     for (let day = 1; day <= daysInMonth; day++) {
       const dateStr = new Date(today.getFullYear(), today.getMonth(), day).toISOString().split('T')[0];
-      const dayTasks = tasks.filter(t => t.dueDate === dateStr);
+      const dayTasks = visibleTasks.filter(t => t.dueDate === dateStr);
 
       days.push(
         <div key={day} className={`border h-32 p-2 relative group overflow-hidden ${isDarkMode ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-blue-50'}`}>
           <span className={`text-sm font-bold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{day}</span>
           <div className="mt-1 space-y-1 overflow-y-auto max-h-[90px] custom-scrollbar">
             {dayTasks.map(t => (
-              <div key={t.id} onClick={() => onEdit(t)} className={`text-[10px] px-1 py-1 rounded truncate cursor-pointer font-medium ${isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'}`}>{t.title}</div>
+              <div key={t.id} onClick={() => handleEditTask(t)} className={`text-[10px] px-1 py-1 rounded truncate cursor-pointer font-medium ${isDarkMode ? 'bg-blue-900 text-blue-200' : 'bg-blue-100 text-blue-700'}`}>{t.title}</div>
             ))}
           </div>
-          <button onClick={() => onQuickAdd("New Event", columns[0])} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500"><Plus size={14} /></button>
+          <button onClick={() => handleAddTask("New Event", columns[0])} className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-blue-500"><Plus size={14} /></button>
         </div>
       );
     }
@@ -84,7 +129,7 @@ export default function TaskBoard({
   };
 
   const handleQuickSubmit = (col) => {
-    if (quickTitle.trim()) { onQuickAdd(quickTitle, col); setQuickTitle(''); setActiveCol(null); }
+    if (quickTitle.trim()) { handleAddTask(quickTitle, col); setQuickTitle(''); setActiveCol(null); }
   };
 
   return (
@@ -108,8 +153,31 @@ export default function TaskBoard({
               {['default', 'priority', 'date'].map(s => (<button key={s} onClick={() => setSortBy(s)} className={`block w-full text-left px-4 py-2 text-xs capitalize ${isDarkMode ? 'text-slate-300 hover:bg-slate-700' : 'text-slate-600 hover:bg-slate-50'}`}>{s}</button>))}
             </div>
           </div>
+          <div className="flex items-center gap-2">
+            <input
+              aria-label="Search tasks"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search..."
+              className={`text-sm px-2 py-1 rounded border focus:outline-none ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}
+            />
+            <select
+              aria-label="Filter by priority"
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className={`text-sm px-2 py-1 rounded border ${isDarkMode ? 'bg-slate-700 border-slate-600 text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+              <option value="all">All priorities</option>
+              <option value="High">High</option>
+              <option value="Medium">Medium</option>
+              <option value="Low">Low</option>
+            </select>
+            <label className={`flex items-center gap-2 text-sm ${isDarkMode ? 'text-slate-300' : 'text-slate-600'}`}>
+              <input type="checkbox" checked={showOnlyMine} onChange={() => setShowOnlyMine(!showOnlyMine)} className="w-4 h-4" />
+              Only mine
+            </label>
+          </div>
         </div>
-        <div className={`text-xs font-semibold uppercase ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{tasks.length} Issues</div>
+        <div className={`text-xs font-semibold uppercase ${isDarkMode ? 'text-slate-500' : 'text-slate-400'}`}>{visibleTasks.length} Issues</div>
       </div>
 
       {viewMode === 'calendar' && renderCalendar()}
@@ -118,10 +186,10 @@ export default function TaskBoard({
         <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
           <div className="flex h-full gap-6 items-start">
             {columns.map(col => {
-              const colTasks = getSortedTasks(tasks.filter(t => t.status === col));
+              const colTasks = getSortedTasks(visibleTasks.filter(t => t.status === col));
               const isOverLimit = colTasks.length > WIP_LIMIT;
               return (
-                <div key={col} className={`min-w-[300px] w-[350px] rounded-lg p-3 flex flex-col max-h-full border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} ${isOverLimit ? 'border-red-400 ring-1 ring-red-400' : ''}`} onDragOver={onDragOver} onDrop={(e) => onDrop(e, col)}>
+                <div key={col} className={`min-w-[300px] w-[350px] rounded-lg p-3 flex flex-col max-h-full border transition-colors ${isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'} ${isOverLimit ? 'border-red-400 ring-1 ring-red-400' : ''}`} onDragOver={onDragOver} onDrop={(e) => { if (onDrop) onDrop(e, col); else handleMoveTask(null, col); }}>
                   {/* Column Header */}
                   <div className="flex justify-between items-center mb-4 px-2 group/header">
                     {renamingCol === col ? (
@@ -143,7 +211,7 @@ export default function TaskBoard({
                     </div>
                   </div>
                   <div className="flex-1 overflow-y-auto min-h-[50px] pr-1 custom-scrollbar">
-                    {colTasks.map(task => (<TaskCard key={task.id} task={task} user={user} onDragStart={onDragStart} onDelete={onDelete} onEdit={onEdit} onClone={onClone} isDarkMode={isDarkMode} onToggleTimer={onToggleTimer} />))}
+                    {colTasks.map(task => (<TaskCard key={task.id} task={task} user={user} onDragStart={onDragStart} onDelete={handleDeleteTask} onEdit={handleEditTask} onClone={onClone} isDarkMode={isDarkMode} onToggleTimer={handleToggleTimer} />))}
                   </div>
                   {activeCol === col ? (
                     <div className={`mt-2 p-2 rounded shadow-sm border ${isDarkMode ? 'bg-slate-700 border-slate-600' : 'bg-white border-blue-300'}`}>
@@ -178,14 +246,14 @@ export default function TaskBoard({
                 <tr><th className="px-6 py-4">Status</th><th className="px-6 py-4 w-1/3">Summary</th><th className="px-6 py-4">Assignee</th><th className="px-6 py-4">Priority</th><th className="px-6 py-4">Due Date</th><th className="px-6 py-4 text-right">Actions</th></tr>
               </thead>
               <tbody className={`divide-y ${isDarkMode ? 'divide-slate-700' : 'divide-slate-100'}`}>
-                {getSortedTasks(tasks).map(task => (
-                  <tr key={task.id} className={`transition cursor-pointer ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`} onClick={() => onEdit(task)}>
+                {getSortedTasks(visibleTasks).map(task => (
+                  <tr key={task.id} className={`transition cursor-pointer ${isDarkMode ? 'hover:bg-slate-700' : 'hover:bg-slate-50'}`} onClick={() => handleEditTask(task)}>
                     <td className="px-6 py-3"><span className={`px-2 py-1 rounded text-xs font-bold ${task.status === 'Done' ? 'bg-green-100 text-green-700' : (isDarkMode ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600')}`}>{task.status}</span></td>
                     <td className={`px-6 py-3 font-medium ${isDarkMode ? 'text-slate-200' : 'text-slate-800'}`}>{task.title}</td>
                     <td className="px-6 py-3">{task.assignee ? <div className="flex items-center gap-2"><img src={task.assignee.image} className="w-6 h-6 rounded-full" /><span>{task.assignee.firstName}</span></div> : <span className="text-slate-400">Unassigned</span>}</td>
                     <td className="px-6 py-3"><span className={`px-2 py-0.5 rounded border text-[10px] font-bold uppercase ${task.priority === 'High' ? 'bg-red-50 text-red-700' : task.priority === 'Medium' ? 'bg-orange-50 text-orange-700' : 'bg-green-50 text-green-700'}`}>{task.priority}</span></td>
                     <td className="px-6 py-3">{task.dueDate || '-'}</td>
-                    <td className="px-6 py-3 text-right"><button onClick={(e) => { e.stopPropagation(); onDelete(task.id) }} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button></td>
+                    <td className="px-6 py-3 text-right"><button onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id) }} className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button></td>
                   </tr>
                 ))}
               </tbody>
