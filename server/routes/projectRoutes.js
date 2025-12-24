@@ -6,9 +6,9 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 router.post('/', authMiddleware, async (req, res) => {
     try {
-        const { name, description, teamLeaderId } = req.body;
+        const { name, description, teamLeaderId, template } = req.body;
         const project = await Project.create({
-            name, description, ownerId: req.user.id, teamLeaderId: teamLeaderId || null
+            name, description, template, ownerId: req.user.id, teamLeaderId: teamLeaderId || null
         });
         // add owner as a member
         await ProjectMember.create({ projectId: project.id, userId: req.user.id });

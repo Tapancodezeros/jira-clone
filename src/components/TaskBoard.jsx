@@ -3,9 +3,10 @@ import api from '../utils/apiClient';
 import { useParams } from 'react-router-dom';
 import Header from './Header';
 import confetti from 'canvas-confetti';
-import { Plus, Trash2, Edit2 } from 'lucide-react';
+import { Plus, Trash2, Edit2, Download, Calendar, Tag } from 'lucide-react';
 import TaskModal from './TaskModal';
 import { useToast } from '../context/ToastContext';
+import TrashModal from './TrashModal';
 
 const TaskBoard = () => {
     const { id } = useParams();
@@ -18,6 +19,7 @@ const TaskBoard = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const { showToast } = useToast();
+    const [isTrashOpen, setIsTrashOpen] = useState(false);
     const pendingDeletes = useRef(new Map());
     const DELETE_TIMEOUT = 5000; // ms
     const columns = ['Todo', 'In Progress', 'Done'];
@@ -95,6 +97,36 @@ const TaskBoard = () => {
         await api.put(`/tasks/${taskId}`, { status });
     };
 
+    const exportToCSV = () => {
+        if (!tasks || tasks.length === 0) return showToast({ msg: 'No tasks to export' });
+
+        const headers = ['ID', 'Title', 'Description', 'Status', 'Priority', 'Assignee', 'Reporter', 'Created At'];
+        const rows = tasks.map(t => [
+            t.id,
+            `"${(t.title || '').replace(/"/g, '""')}"`,
+            `"${(t.description || '').replace(/"/g, '""')}"`,
+            t.status,
+            t.priority,
+            `"${(t.assignee?.name || 'Unassigned').replace(/"/g, '""')}"`,
+            `"${(t.reporter?.name || 'Unknown').replace(/"/g, '""')}"`,
+            t.createdAt || ''
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(",") + "\n"
+            + rows.map(e => e.join(",")).join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `tasks_${id}_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast({ msg: 'Exporting tasks...' });
+    };
+
     return (
         <>
             <Header />
@@ -107,13 +139,21 @@ const TaskBoard = () => {
                         <button onClick={() => setShowMyTasks(true)} className={`px-3 py-1 ${showMyTasks ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>My Tasks</button>
                         <button onClick={() => setShowMyTasks(false)} className={`px-3 py-1 ${!showMyTasks ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>All Tasks</button>
                     </div>
+                    <div className="ml-auto flex items-center gap-2">
+                        <button onClick={exportToCSV} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Export to CSV">
+                            <Download size={20} />
+                        </button>
+                        <button onClick={() => setIsTrashOpen(true)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Trash Bin">
+                            <Trash2 size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex gap-5 h-[80vh]">
                     <div className="flex-1 flex gap-5">
                         {columns.map(col => (
-                            <div 
-                                key={col} 
+                            <div
+                                key={col}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => handleDrop(e, col)}
                                 className="flex-1 bg-gray-100 p-3 rounded"
@@ -127,54 +167,69 @@ const TaskBoard = () => {
                                         return currentUser ? String(t.assigneeId) === String(currentUser.id) : true;
                                     })
                                     .map(task => (
-                                    <div 
-                                        key={task.id} 
-                                        draggable 
-                                        onDragStart={(e) => e.dataTransfer.setData("taskId", task.id)}
-                                        onDoubleClick={() => { setSelectedTask(task); setIsModalOpen(true); }}
-                                        className="bg-white p-3 my-2 rounded shadow cursor-grab relative"
-                                    >
-                                        <button onClick={(ev) => {
-                                            ev.stopPropagation();
-                                            // schedule deletion with undo
-                                            setTasks(prev => prev.filter(t => t.id !== task.id));
-                                            const timer = setTimeout(async () => {
-                                                try { await api.del(`/tasks/${task.id}`); } catch (err) { console.error('Delete failed', err); showToast({ msg: 'Delete failed' }); }
-                                                pendingDeletes.current.delete(task.id);
-                                            }, DELETE_TIMEOUT);
-                                            pendingDeletes.current.set(task.id, { timer, task });
-                                            showToast({ msg: 'Task deleted', actionLabel: 'Undo', onAction: async () => {
-                                                const entry = pendingDeletes.current.get(task.id);
-                                                if (!entry) return;
-                                                clearTimeout(entry.timer);
-                                                // restore locally
-                                                setTasks(prev => [entry.task, ...prev]);
-                                                pendingDeletes.current.delete(task.id);
-                                                // try to restore on server as well (in case delete already executed)
-                                                try {
-                                                    await api.post(`/tasks/${task.id}/restore`);
-                                                    showToast({ msg: 'Delete undone', duration: 2000 });
-                                                } catch (err) {
-                                                    // still show undone locally; inform user if server restore failed
-                                                    console.error('Restore failed', err);
-                                                    showToast({ msg: 'Undo failed on server', duration: 3000 });
-                                                }
-                                            }, duration: DELETE_TIMEOUT });
-                                        }} className="absolute top-2 right-2 text-red-500">
-                                            <Trash2 size={14} />
-                                        </button>
-                                        <strong>{task.title}</strong>
-                                        <div className="mt-2">
-                                            <button onClick={(ev) => { ev.stopPropagation(); setSelectedTask(task); setIsModalOpen(true); }} className="text-xs text-blue-600 inline-flex items-center gap-1">
-                                                <Edit2 size={14} /> Edit
+                                        <div
+                                            key={task.id}
+                                            draggable
+                                            onDragStart={(e) => e.dataTransfer.setData("taskId", task.id)}
+                                            onDoubleClick={() => { setSelectedTask(task); setIsModalOpen(true); }}
+                                            className="bg-white p-3 my-2 rounded shadow cursor-grab relative"
+                                        >
+                                            <button onClick={(ev) => {
+                                                ev.stopPropagation();
+                                                // schedule deletion with undo
+                                                setTasks(prev => prev.filter(t => t.id !== task.id));
+                                                const timer = setTimeout(async () => {
+                                                    try { await api.del(`/tasks/${task.id}`); } catch (err) { console.error('Delete failed', err); showToast({ msg: 'Delete failed' }); }
+                                                    pendingDeletes.current.delete(task.id);
+                                                }, DELETE_TIMEOUT);
+                                                pendingDeletes.current.set(task.id, { timer, task });
+                                                showToast({
+                                                    msg: 'Task deleted', actionLabel: 'Undo', onAction: async () => {
+                                                        const entry = pendingDeletes.current.get(task.id);
+                                                        if (!entry) return;
+                                                        clearTimeout(entry.timer);
+                                                        // restore locally
+                                                        setTasks(prev => [entry.task, ...prev]);
+                                                        pendingDeletes.current.delete(task.id);
+                                                        // try to restore on server as well (in case delete already executed)
+                                                        try {
+                                                            await api.post(`/tasks/${task.id}/restore`);
+                                                            showToast({ msg: 'Delete undone', duration: 2000 });
+                                                        } catch (err) {
+                                                            // still show undone locally; inform user if server restore failed
+                                                            console.error('Restore failed', err);
+                                                            showToast({ msg: 'Undo failed on server', duration: 3000 });
+                                                        }
+                                                    }, duration: DELETE_TIMEOUT
+                                                });
+                                            }} className="absolute top-2 right-2 text-red-500">
+                                                <Trash2 size={14} />
                                             </button>
+                                            <strong>{task.title}</strong>
+                                            <div className="mt-2">
+                                                <button onClick={(ev) => { ev.stopPropagation(); setSelectedTask(task); setIsModalOpen(true); }} className="text-xs text-blue-600 inline-flex items-center gap-1">
+                                                    <Edit2 size={14} /> Edit
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-gray-600">{task.priority}</p>
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                                {Array.isArray(task.labels) && task.labels.map((l, i) => (
+                                                    <span key={i} className="text-[10px] uppercase font-bold text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded">
+                                                        {l}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+                                                <div className="flex items-center gap-1">
+                                                    <Calendar size={12} />
+                                                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No Date'}
+                                                </div>
+                                                <div className="text-blue-600 font-medium">
+                                                    {task.assignee?.name || 'Unassigned'}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-gray-600">{task.priority}</p>
-                                        <div className="text-xs text-blue-600 mt-1">
-                                            {task.assignee?.name || 'Unassigned'}
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
                             </div>
                         ))}
                     </div>
@@ -227,6 +282,7 @@ const TaskBoard = () => {
                     </aside>
                 </div>
             </div>
+            {isTrashOpen && <TrashModal projectId={id} onClose={() => setIsTrashOpen(false)} onUpdate={fetchTasks} />}
             {isModalOpen && <TaskModal task={selectedTask} projectId={id} onClose={() => { setIsModalOpen(false); setSelectedTask(null); }} onSave={() => { fetchTasks(); setSelectedTask(null); }} onDelete={(t) => {
                 // handle delete from modal with same undo flow
                 setIsModalOpen(false);
@@ -237,20 +293,22 @@ const TaskBoard = () => {
                     pendingDeletes.current.delete(t.id);
                 }, DELETE_TIMEOUT);
                 pendingDeletes.current.set(t.id, { timer, task: t });
-                showToast({ msg: 'Task deleted', actionLabel: 'Undo', onAction: async () => {
-                    const entry = pendingDeletes.current.get(t.id);
-                    if (!entry) return;
-                    clearTimeout(entry.timer);
-                    setTasks(prev => [entry.task, ...prev]);
-                    pendingDeletes.current.delete(t.id);
-                    try {
-                        await api.post(`/tasks/${t.id}/restore`);
-                        showToast({ msg: 'Delete undone', duration: 2000 });
-                    } catch (err) {
-                        console.error('Restore failed', err);
-                        showToast({ msg: 'Undo failed on server', duration: 3000 });
-                    }
-                }, duration: DELETE_TIMEOUT });
+                showToast({
+                    msg: 'Task deleted', actionLabel: 'Undo', onAction: async () => {
+                        const entry = pendingDeletes.current.get(t.id);
+                        if (!entry) return;
+                        clearTimeout(entry.timer);
+                        setTasks(prev => [entry.task, ...prev]);
+                        pendingDeletes.current.delete(t.id);
+                        try {
+                            await api.post(`/tasks/${t.id}/restore`);
+                            showToast({ msg: 'Delete undone', duration: 2000 });
+                        } catch (err) {
+                            console.error('Restore failed', err);
+                            showToast({ msg: 'Undo failed on server', duration: 3000 });
+                        }
+                    }, duration: DELETE_TIMEOUT
+                });
             }} />}
         </>
     );

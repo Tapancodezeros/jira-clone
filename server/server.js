@@ -12,6 +12,7 @@ app.use(express.json());
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/projects', require('./routes/projectRoutes'));
 app.use('/api/tasks', require('./routes/taskRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 
 // Simple health-check endpoint
 app.get('/api/health', (req, res) => res.json({ ok: true }));
