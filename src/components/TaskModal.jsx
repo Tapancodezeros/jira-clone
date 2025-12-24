@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/apiClient';
 import { useToast } from '../context/ToastContext';
-import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar } from 'lucide-react';
+import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare } from 'lucide-react';
 
 const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [title, setTitle] = useState('');
@@ -16,6 +16,8 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [comments, setComments] = useState([]);
     const [activities, setActivities] = useState([]);
     const [newComment, setNewComment] = useState('');
+    const [subtasks, setSubtasks] = useState([]);
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
     // For now simple single tag, later can be array
     const [activeTab, setActiveTab] = useState('details');
@@ -42,10 +44,35 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
         if (data) setActivities(data);
     };
 
+    const fetchSubtasks = async (tid) => {
+        if (!tid) return;
+        const data = await api.get(`/tasks/${tid}/subtasks`);
+        if (data) setSubtasks(data);
+    };
+
+    const handleAddSubtask = async () => {
+        if (!newSubtaskTitle.trim() || !task) return;
+        try {
+            await api.post('/tasks', {
+                title: newSubtaskTitle,
+                projectId: task.projectId,
+                parentTaskId: task.id,
+                status: 'Todo',
+                priority: 'Medium'
+            });
+            setNewSubtaskTitle('');
+            fetchSubtasks(task.id);
+        } catch (err) {
+            console.error('Failed to add subtask', err);
+            showToast({ msg: 'Failed to add subtask' });
+        }
+    };
+
     useEffect(() => {
         if (task && task.id) {
             if (activeTab === 'comments') fetchComments(task.id);
             if (activeTab === 'history') fetchActivities(task.id);
+            if (activeTab === 'subtasks') fetchSubtasks(task.id);
         }
     }, [activeTab, task]);
 
@@ -138,6 +165,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         {/* Tabs */}
                         <div className="flex items-center gap-6 border-b mb-6 border-gray-100">
                             <button onClick={() => setActiveTab('details')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'details' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Details</button>
+                            <button onClick={() => setActiveTab('subtasks')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'subtasks' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Subtasks</button>
                             <button onClick={() => setActiveTab('comments')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Comments</button>
                             <button onClick={() => setActiveTab('history')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>History</button>
                         </div>
@@ -153,6 +181,42 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                 />
+                            </div>
+                        )}
+                        {activeTab === 'subtasks' && (
+                            <div className="animate-in fade-in duration-200">
+                                <div className="space-y-3 mb-6">
+                                    {subtasks.length === 0 && <p className="text-gray-500 text-sm italic py-2">No subtasks yet</p>}
+                                    {subtasks.map(st => (
+                                        <div key={st.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all">
+                                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${st.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-gray-50'}`}>
+                                                {st.status === 'Done' && <CheckSquare size={12} className="text-white" />}
+                                            </div>
+                                            <span className={`text-sm flex-1 ${st.status === 'Done' ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>{st.title}</span>
+
+                                            <div className="flex items-center gap-2">
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${st.priority === 'High' || st.priority === 'Critical' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>{st.priority}</span>
+                                                <span className="text-xs text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-200">{st.status}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        className="flex-1 bg-white border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                                        placeholder="What needs to be done?"
+                                        value={newSubtaskTitle}
+                                        onChange={e => setNewSubtaskTitle(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleAddSubtask()}
+                                    />
+                                    <button
+                                        onClick={handleAddSubtask}
+                                        className="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                                    >
+                                        Add Subtask
+                                    </button>
+                                </div>
                             </div>
                         )}
                         {activeTab === 'comments' && (
@@ -261,6 +325,14 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                             <option value="">Unassigned</option>
                                             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                         </select>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                                            <User size={14} /> Reporter
+                                        </div>
+                                        <span className="text-sm font-medium text-gray-800">
+                                            {task?.reporter?.name || 'Unknown'}
+                                        </span>
                                     </div>
                                     {/* Mock Dates */}
                                     <div className="flex items-center justify-between pt-2">

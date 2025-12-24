@@ -14,9 +14,11 @@ const Task = sequelize.define('Task', {
         defaultValue: 'Medium'
     },
     assigneeId: { type: DataTypes.INTEGER, allowNull: true },
+    reporterId: { type: DataTypes.INTEGER, allowNull: true },
     projectId: { type: DataTypes.INTEGER, allowNull: false },
     dueDate: { type: DataTypes.DATEONLY, allowNull: true },
-    labels: { type: DataTypes.JSON, defaultValue: [] }
+    labels: { type: DataTypes.JSON, defaultValue: [] },
+    parentTaskId: { type: DataTypes.INTEGER, allowNull: true }
 }, {
     paranoid: true,
     timestamps: true

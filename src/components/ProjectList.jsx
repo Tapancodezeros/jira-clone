@@ -2,29 +2,61 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
 import api from '../utils/apiClient';
-import { LayoutGrid, List, Plus, Search, FolderOpen } from 'lucide-react';
+import { LayoutGrid, List, Plus, Search, FolderOpen, Trash2, CheckCircle, Clock } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 const ProjectList = () => {
     const [projects, setProjects] = useState([]);
+    const [stats, setStats] = useState({ totalProjects: 0, activeTasks: 0, completedTasks: 0 });
     const navigate = useNavigate();
     const [search, setSearch] = useState('');
     const [viewMode, setViewMode] = useState('grid');
     const [sortBy, setSortBy] = useState('newest');
+    const { showToast } = useToast();
 
-    useEffect(() => {
-        const fetchProjects = async () => {
+    const fetchProjects = async () => {
+        try {
             const data = await api.get('/projects');
             if (data) setProjects(data);
-        };
+        } catch (error) {
+            console.error('Failed to fetch projects', error);
+        }
+    };
+
+    const fetchStats = async () => {
+        try {
+            const data = await api.get('/projects/dashboard-stats');
+            if (data) setStats(data);
+        } catch (error) {
+            console.error('Failed to fetch stats', error);
+        }
+    };
+
+    useEffect(() => {
         fetchProjects();
+        fetchStats();
     }, []);
+
+    const handleDeleteProject = async (e, projectId) => {
+        e.stopPropagation();
+        if (window.confirm('Are you sure you want to delete this project? This cannot be undone.')) {
+            try {
+                await api.delete(`/projects/${projectId}`);
+                showToast({ msg: 'Project deleted successfully', type: 'success' });
+                fetchProjects();
+                fetchStats();
+            } catch (error) {
+                console.error('Failed to delete project', error);
+                showToast({ msg: error?.message || 'Failed to delete project', type: 'error' });
+            }
+        }
+    };
 
     const filteredProjects = useMemo(() => {
         let res = projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
         if (sortBy === 'name') {
             res.sort((a, b) => a.name.localeCompare(b.name));
         } else {
-            // assume id reflects creation time or backend gives createdAt
             res.sort((a, b) => b.id - a.id);
         }
         return res;
@@ -51,23 +83,23 @@ const ProjectList = () => {
                             <FolderOpen size={20} />
                             <span className="text-sm font-medium">Total Projects</span>
                         </div>
-                        <div className="text-3xl font-bold">{projects.length}</div>
+                        <div className="text-3xl font-bold">{stats.totalProjects}</div>
                     </div>
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                            <Clock size={20} className="text-yellow-500" />
                             <span className="text-sm font-medium">Active Tasks</span>
                         </div>
-                        <div className="text-3xl font-bold text-gray-800">12</div>
+                        <div className="text-3xl font-bold text-gray-800">{stats.activeTasks}</div>
                         <p className="text-xs text-gray-400 mt-1">Across all projects</p>
                     </div>
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm">
                         <div className="flex items-center gap-3 mb-2 text-gray-500">
-                            <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                            <CheckCircle size={20} className="text-green-500" />
                             <span className="text-sm font-medium">Completed</span>
                         </div>
-                        <div className="text-3xl font-bold text-gray-800">48</div>
-                        <p className="text-xs text-gray-400 mt-1">In the last 30 days</p>
+                        <div className="text-3xl font-bold text-gray-800">{stats.completedTasks}</div>
+                        <p className="text-xs text-gray-400 mt-1">All time</p>
                     </div>
                 </div>
 
@@ -132,11 +164,20 @@ const ProjectList = () => {
                                 <div className={`${viewMode === 'list' ? 'flex-1' : 'flex-1'}`}>
                                     <div className="flex items-start justify-between">
                                         <h3 className="text-lg font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">{p.name}</h3>
-                                        {p.template && (
-                                            <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full tracking-wide">
-                                                {p.template}
-                                            </span>
-                                        )}
+                                        <div className="flex gap-2">
+                                            {p.template && (
+                                                <span className="text-[10px] uppercase font-bold px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full tracking-wide">
+                                                    {p.template}
+                                                </span>
+                                            )}
+                                            <button
+                                                onClick={(e) => handleDeleteProject(e, p.id)}
+                                                className="p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 rounded transition-colors opacity-0 group-hover:opacity-100"
+                                                title="Delete Project"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     </div>
                                     <p className={`text-sm text-gray-500 mt-2 line-clamp-2 ${viewMode === 'list' ? 'mb-0' : 'mb-4'}`}>
                                         {p.description || 'No description provided.'}
@@ -145,12 +186,16 @@ const ProjectList = () => {
                                 <div className={`flex items-center justify-between text-xs text-gray-500 ${viewMode === 'list' ? 'w-48 justify-end gap-8' : 'pt-4 border-t mt-auto'}`}>
                                     <div className="flex items-center gap-2">
                                         <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-[10px]">
+                                            {p.owner?.name?.[0] || 'O'}
+                                        </div>
+                                        <span>Owner: {p.owner?.name || 'Unknown'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-[10px]">
                                             {p.teamLeader?.name?.[0] || 'T'}
                                         </div>
-                                        <span>{p.teamLeader?.name || 'No Leader'}</span>
+                                        <span>Leader: {p.teamLeader?.name || 'None'}</span>
                                     </div>
-                                    {/* Placeholder for project stats or date */}
-                                    <span>ID: {p.id}</span>
                                 </div>
                             </div>
                         ))}

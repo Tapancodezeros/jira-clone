@@ -8,7 +8,10 @@ router.get('/:projectId', authMiddleware, async (req, res) => {
     try {
         const tasks = await Task.findAll({
             where: { projectId: req.params.projectId },
-            include: [{ model: User, as: 'assignee', attributes: ['name'] }]
+            include: [
+                { model: User, as: 'assignee', attributes: ['name', 'id'] },
+                { model: User, as: 'reporter', attributes: ['name', 'id'] }
+            ]
         });
         res.json(tasks);
     } catch (error) { res.status(500).json({ message: error.message }); }
@@ -17,7 +20,7 @@ router.get('/:projectId', authMiddleware, async (req, res) => {
 // Create Task
 router.post('/', authMiddleware, async (req, res) => {
     try {
-        const { title, description, projectId, assigneeId, status, priority } = req.body;
+        const { title, description, projectId, assigneeId, status, priority, dueDate, labels, parentTaskId } = req.body;
 
         // validate assigneeId if provided
         let finalAssignee = null;
@@ -30,7 +33,19 @@ router.post('/', authMiddleware, async (req, res) => {
         }
 
         const task = await Task.create({
-            title, description, projectId, assigneeId: finalAssignee, status, priority
+            title, description, projectId, assigneeId: finalAssignee, status, priority,
+            dueDate: dueDate || null,
+            labels: labels || [],
+            parentTaskId: parentTaskId || null,
+            reporterId: req.user.id
+        });
+
+        // Log creation activity
+        await Activity.create({
+            taskId: task.id,
+            userId: req.user.id,
+            type: 'create',
+            description: 'created this task'
         });
 
         if (finalAssignee) {
@@ -41,22 +56,64 @@ router.post('/', authMiddleware, async (req, res) => {
                 type: 'info',
                 link: `/project/${projectId}`
             });
+            // Log assignment
+            await Activity.create({
+                taskId: task.id,
+                userId: req.user.id,
+                type: 'update',
+                description: `assigned to user #${finalAssignee}`
+            });
         }
         res.status(201).json(task);
     } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
-// Update Task (Drag and Drop status change)
+// Update Task (Drag and Drop status change + details edit)
 router.put('/:id', authMiddleware, async (req, res) => {
     try {
         const task = await Task.findByPk(req.params.id);
         if (task) {
             const oldAssignee = task.assigneeId;
+            const oldStatus = task.status;
+            const oldPriority = task.priority;
+
             await task.update(req.body);
 
+            // Log Status Change
+            if (req.body.status && req.body.status !== oldStatus) {
+                await Activity.create({
+                    taskId: task.id,
+                    userId: req.user.id,
+                    type: 'status',
+                    description: `changed status from ${oldStatus} to ${req.body.status}`
+                });
+            }
+
+            // Log Priority Change
+            if (req.body.priority && req.body.priority !== oldPriority) {
+                await Activity.create({
+                    taskId: task.id,
+                    userId: req.user.id,
+                    type: 'priority',
+                    description: `changed priority from ${oldPriority} to ${req.body.priority}`
+                });
+            }
+
+            // Log Assignment Change
             if (req.body.assigneeId && Number(req.body.assigneeId) !== oldAssignee) {
+                const newAssigneeId = Number(req.body.assigneeId);
+                const newAssignee = await User.findByPk(newAssigneeId);
+                const assigneeName = newAssignee ? newAssignee.name : 'Unknown';
+
+                await Activity.create({
+                    taskId: task.id,
+                    userId: req.user.id,
+                    type: 'assign',
+                    description: `assigned to ${assigneeName}`
+                });
+
                 await Notification.create({
-                    userId: req.body.assigneeId,
+                    userId: newAssigneeId,
                     title: 'Task Assignment Update',
                     message: `You have been assigned to task: ${task.title}`,
                     type: 'info',
@@ -144,6 +201,21 @@ router.get('/:id/activities', authMiddleware, async (req, res) => {
             order: [['createdAt', 'DESC']]
         });
         res.json(activities);
+    } catch (error) { res.status(500).json({ message: error.message }); }
+});
+
+// Get subtasks for a task
+router.get('/:id/subtasks', authMiddleware, async (req, res) => {
+    try {
+        const subtasks = await Task.findAll({
+            where: { parentTaskId: req.params.id },
+            include: [
+                { model: User, as: 'assignee', attributes: ['name', 'id'] },
+                { model: User, as: 'reporter', attributes: ['name', 'id'] }
+            ],
+            order: [['createdAt', 'ASC']]
+        });
+        res.json(subtasks);
     } catch (error) { res.status(500).json({ message: error.message }); }
 });
 

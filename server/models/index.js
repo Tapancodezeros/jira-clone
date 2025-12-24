@@ -26,6 +26,9 @@ User.belongsToMany(Project, { through: ProjectMember, foreignKey: 'userId', othe
 User.hasMany(Task, { foreignKey: 'assigneeId', as: 'assignedTasks' });
 Task.belongsTo(User, { foreignKey: 'assigneeId', as: 'assignee' });
 
+User.hasMany(Task, { foreignKey: 'reporterId', as: 'reportedTasks' });
+Task.belongsTo(User, { foreignKey: 'reporterId', as: 'reporter' });
+
 // User <-> Notification
 User.hasMany(Notification, { foreignKey: 'userId', onDelete: 'CASCADE' });
 Notification.belongsTo(User, { foreignKey: 'userId' });
@@ -39,5 +42,9 @@ Comment.belongsTo(User, { foreignKey: 'userId', as: 'author' });
 Task.hasMany(Activity, { foreignKey: 'taskId', as: 'activities', onDelete: 'CASCADE' });
 Activity.belongsTo(Task, { foreignKey: 'taskId' });
 Activity.belongsTo(User, { foreignKey: 'userId', as: 'actor' });
+
+// Task hierarchy (Subtasks)
+Task.hasMany(Task, { foreignKey: 'parentTaskId', as: 'subtasks', onDelete: 'CASCADE' });
+Task.belongsTo(Task, { foreignKey: 'parentTaskId', as: 'parentTask' });
 
 module.exports = { sequelize, User, Project, Task, ProjectMember, Notification, Comment, Activity };
