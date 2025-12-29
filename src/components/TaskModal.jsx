@@ -188,7 +188,20 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                 <div className="space-y-3 mb-6">
                                     {subtasks.length === 0 && <p className="text-gray-500 text-sm italic py-2">No subtasks yet</p>}
                                     {subtasks.map(st => (
-                                        <div key={st.id} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all">
+                                        <div
+                                            key={st.id}
+                                            onClick={async () => {
+                                                const newStatus = st.status === 'Done' ? 'Todo' : 'Done';
+                                                try {
+                                                    await api.put(`/tasks/${st.id}`, { status: newStatus });
+                                                    fetchSubtasks(task.id);
+                                                } catch (err) {
+                                                    console.error('Failed to update subtask', err);
+                                                    showToast({ msg: 'Failed to update subtask' });
+                                                }
+                                            }}
+                                            className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all cursor-pointer"
+                                        >
                                             <div className={`w-5 h-5 rounded flex items-center justify-center border ${st.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-gray-50'}`}>
                                                 {st.status === 'Done' && <CheckSquare size={12} className="text-white" />}
                                             </div>

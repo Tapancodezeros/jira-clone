@@ -77,6 +77,23 @@ router.put('/:id', authMiddleware, async (req, res) => {
             const oldStatus = task.status;
             const oldPriority = task.priority;
 
+            // Check subtask completion if moving to Done
+            if (req.body.status === 'Done' && oldStatus !== 'Done') {
+                const subtaskCount = await Task.count({ where: { parentTaskId: task.id } });
+                if (subtaskCount > 0) {
+                    const { Op } = require('sequelize');
+                    const incompleteSubtasks = await Task.count({
+                        where: {
+                            parentTaskId: task.id,
+                            status: { [Op.ne]: 'Done' }
+                        }
+                    });
+                    if (incompleteSubtasks > 0) {
+                        return res.status(400).json({ message: 'Cannot complete task. All subtasks must be completed first.' });
+                    }
+                }
+            }
+
             await task.update(req.body);
 
             // Log Status Change
@@ -130,9 +147,11 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // Delete Task
 router.delete('/:id', authMiddleware, async (req, res) => {
     try {
-        const task = await Task.findByPk(req.params.id);
+        const force = req.query.permanent === 'true';
+        const task = await Task.findByPk(req.params.id, { paranoid: !force });
+
         if (task) {
-            await task.destroy();
+            await task.destroy({ force });
             return res.json({ success: true });
         }
         res.status(404).json({ message: 'Task not found' });

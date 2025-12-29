@@ -16,6 +16,18 @@ router.get('/', authMiddleware, async (req, res) => {
     }
 });
 
+// Mark all as read
+router.put('/read-all', authMiddleware, async (req, res) => {
+    try {
+        await Notification.update({ read: true }, {
+            where: { userId: req.user.id, read: false }
+        });
+        res.json({ message: 'All notifications marked as read' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
 // Mark as read
 router.put('/:id/read', authMiddleware, async (req, res) => {
     try {
@@ -27,6 +39,19 @@ router.put('/:id/read', authMiddleware, async (req, res) => {
         notif.read = true;
         await notif.save();
         res.json(notif);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+});
+
+// Delete notification
+router.delete('/:id', authMiddleware, async (req, res) => {
+    try {
+        const deleted = await Notification.destroy({
+            where: { id: req.params.id, userId: req.user.id }
+        });
+        if (!deleted) return res.status(404).json({ message: 'Notification not found' });
+        res.json({ message: 'Notification deleted' });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

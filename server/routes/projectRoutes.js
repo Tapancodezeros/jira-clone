@@ -110,6 +110,25 @@ router.get('/:id/stats', authMiddleware, async (req, res) => {
     } catch (error) { res.status(500).json({ message: error.message }); }
 });
 
+// Get deleted tasks (trash)
+router.get('/:id/trash', authMiddleware, async (req, res) => {
+    try {
+        const { Op } = require('sequelize');
+        const tasks = await Task.findAll({
+            where: {
+                projectId: req.params.id,
+                deletedAt: { [Op.not]: null }
+            },
+            paranoid: false,
+            include: [
+                { model: User, as: 'assignee', attributes: ['name', 'id'] }
+            ],
+            order: [['deletedAt', 'DESC']]
+        });
+        res.json(tasks);
+    } catch (error) { res.status(500).json({ message: error.message }); }
+});
+
 // Get members for a project
 router.get('/:projectId/members', authMiddleware, async (req, res) => {
     try {

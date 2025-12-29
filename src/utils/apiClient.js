@@ -52,7 +52,16 @@ export async function fetchNotifications() {
 
 export async function markNotificationRead(id) {
   if (!id) throw new Error('id required');
-  return requestWithRetry(`/notifications/${id}/read`, { method: 'POST' }, 1, 200);
+  return requestWithRetry(`/notifications/${id}/read`, { method: 'PUT' }, 1, 200);
+}
+
+export async function markAllNotificationsRead() {
+  return requestWithRetry('/notifications/read-all', { method: 'PUT' }, 1, 200);
+}
+
+export async function deleteNotification(id) {
+  if (!id) throw new Error('id required');
+  return requestWithRetry(`/notifications/${id}`, { method: 'DELETE' }, 1, 200);
 }
 
 export default api;

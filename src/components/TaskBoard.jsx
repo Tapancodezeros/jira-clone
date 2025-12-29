@@ -160,6 +160,7 @@ const TaskBoard = () => {
                             >
                                 <h4 className="uppercase text-sm text-gray-500">{col}</h4>
                                 {tasks
+                                    .filter(t => !t.parentTaskId) // Hide subtasks from main board
                                     .filter(t => t.status === col)
                                     // show only tasks assigned to the logged in user
                                     .filter(t => {

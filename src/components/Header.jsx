@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Home, Bell, Search, Moon, Sun, User } from 'lucide-react';
-import api, { fetchNotifications, markNotificationRead } from '../utils/apiClient';
+import { LogOut, Home, Bell, Search, Moon, Sun, User, CheckCheck, Trash2 } from 'lucide-react';
+import api, { fetchNotifications, markNotificationRead, markAllNotificationsRead, deleteNotification } from '../utils/apiClient';
 import { toggleTheme, initTheme } from '../utils/theme';
 import { useToast } from '../context/ToastContext';
 
@@ -75,6 +75,38 @@ const Header = () => {
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     };
 
+    const handleNotificationClick = (n) => {
+        if (!n.read) {
+            handleMarkRead(n.id || n._id);
+        }
+        if (n.link) {
+            navigate(n.link);
+            setShowNotifs(false);
+        }
+
+    };
+
+    const handleMarkAllRead = async () => {
+        try {
+            await markAllNotificationsRead();
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            showToast({ msg: 'All marked as read' });
+        } catch (error) {
+            showToast({ msg: 'Failed to mark all read' });
+        }
+    };
+
+    const handleDelete = async (e, id) => {
+        e.stopPropagation();
+        try {
+            await deleteNotification(id);
+            setNotifications(prev => prev.filter(n => (n.id || n._id) !== id));
+            showToast({ msg: 'Notification removed' });
+        } catch (error) {
+            showToast({ msg: 'Failed to remove' });
+        }
+    };
+
     return (
         <header className="px-6 py-3 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center sticky top-0 z-40 shadow-sm transition-colors duration-200">
             {/* Logo Section */}
@@ -119,7 +151,18 @@ const Header = () => {
                         <div className="absolute right-0 mt-3 w-80 bg-white dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
                             <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-800/50">
                                 <h4 className="font-semibold text-gray-800 dark:text-gray-100">Notifications</h4>
-                                <span className="text-xs text-gray-500">{notifications.filter(n => !n.read).length} new</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">{notifications.filter(n => !n.read).length} new</span>
+                                    {notifications.some(n => !n.read) && (
+                                        <button
+                                            onClick={handleMarkAllRead}
+                                            title="Mark all as read"
+                                            className="text-gray-400 hover:text-blue-600 transition-colors"
+                                        >
+                                            <CheckCheck size={16} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="max-h-[300px] overflow-y-auto">
                                 {notifications.length === 0 ? (
@@ -129,18 +172,31 @@ const Header = () => {
                                     </div>
                                 ) : (
                                     notifications.map((n) => (
-                                        <div key={n.id || n._id || Math.random()} className={`p-4 border-b dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors ${n.read ? 'opacity-60' : 'bg-blue-50/30'}`}>
+                                        <div
+                                            key={n.id || n._id || Math.random()}
+                                            onClick={() => handleNotificationClick(n)}
+                                            className={`p-4 border-b dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer ${n.read ? 'opacity-60' : 'bg-blue-50/30'}`}
+                                        >
                                             <div className="text-sm text-gray-800 dark:text-gray-200 font-medium mb-1">{n.title || n.msg || 'Notification'}</div>
                                             <div className="flex justify-between items-center mt-2">
                                                 <span className="text-xs text-gray-400">{n.time ? new Date(n.time).toLocaleString() : 'Just now'}</span>
-                                                {!n.read && (
+                                                <div className="flex gap-2">
+                                                    {!n.read && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleMarkRead(n.id || n._id); }}
+                                                            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                                                        >
+                                                            Mark as read
+                                                        </button>
+                                                    )}
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); handleMarkRead(n.id || n._id); }}
-                                                        className="text-xs font-medium text-blue-600 hover:text-blue-700"
+                                                        onClick={(e) => handleDelete(e, n.id || n._id)}
+                                                        className="text-gray-400 hover:text-red-500 transition-colors"
+                                                        title="Delete"
                                                     >
-                                                        Mark as read
+                                                        <Trash2 size={14} />
                                                     </button>
-                                                )}
+                                                </div>
                                             </div>
                                         </div>
                                     ))
