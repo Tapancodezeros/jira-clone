@@ -5,6 +5,7 @@ import Header from './Header';
 import confetti from 'canvas-confetti';
 import { Plus, Trash2, Edit2, Download, Calendar, Tag } from 'lucide-react';
 import TaskModal from './TaskModal';
+import TaskCard from './TaskCard';
 import { useToast } from '../context/ToastContext';
 import TrashModal from './TrashModal';
 
@@ -130,162 +131,166 @@ const TaskBoard = () => {
     return (
         <>
             <Header />
-            <div className="p-5">
-                <div className="mb-5 flex items-center gap-3">
-                    <button onClick={() => setIsModalOpen(true)} className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded">
-                        <Plus size={16} /> Add Task
-                    </button>
-                    <div className="ml-2 inline-flex items-center border rounded">
-                        <button onClick={() => setShowMyTasks(true)} className={`px-3 py-1 ${showMyTasks ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>My Tasks</button>
-                        <button onClick={() => setShowMyTasks(false)} className={`px-3 py-1 ${!showMyTasks ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>All Tasks</button>
+            <div className="p-6 h-[calc(100vh-80px)] overflow-hidden">
+                <div className="mb-6 flex items-center justify-between glass-panel p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 animate-in fade-in slide-in-from-top-4">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setIsModalOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30">
+                            <Plus size={18} /> New Task
+                        </button>
+                        <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-xl">
+                            <button onClick={() => setShowMyTasks(true)} className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${showMyTasks ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}>My Tasks</button>
+                            <button onClick={() => setShowMyTasks(false)} className={`px-4 py-1.5 text-sm font-medium rounded-lg transition-all ${!showMyTasks ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}>All Tasks</button>
+                        </div>
                     </div>
-                    <div className="ml-auto flex items-center gap-2">
-                        <button onClick={exportToCSV} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Export to CSV">
+                    <div className="flex items-center gap-3">
+                        <button onClick={exportToCSV} className="p-2.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-800 rounded-lg transition-colors" title="Export to CSV">
                             <Download size={20} />
                         </button>
-                        <button onClick={() => setIsTrashOpen(true)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Trash Bin">
+                        <button onClick={() => setIsTrashOpen(true)} className="p-2.5 text-gray-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors" title="Trash Bin">
                             <Trash2 size={20} />
                         </button>
                     </div>
                 </div>
 
-                <div className="flex gap-5 h-[80vh]">
-                    <div className="flex-1 flex gap-5">
+                <div className="flex gap-6 h-full pb-4">
+                    <div className="flex-1 flex gap-6 overflow-x-auto pb-4">
                         {columns.map(col => (
                             <div
                                 key={col}
                                 onDragOver={(e) => e.preventDefault()}
                                 onDrop={(e) => handleDrop(e, col)}
-                                className="flex-1 bg-gray-100 p-3 rounded"
+                                className="flex-1 min-w-[300px] bg-slate-50/50 dark:bg-slate-800/20 backdrop-blur-sm p-4 rounded-2xl border border-gray-200/50 dark:border-slate-800 flex flex-col h-full"
                             >
-                                <h4 className="uppercase text-sm text-gray-500">{col}</h4>
-                                {tasks
-                                    .filter(t => !t.parentTaskId) // Hide subtasks from main board
-                                    .filter(t => t.status === col)
-                                    // show only tasks assigned to the logged in user
-                                    .filter(t => {
-                                        if (!showMyTasks) return true;
-                                        return currentUser ? String(t.assigneeId) === String(currentUser.id) : true;
-                                    })
-                                    .map(task => (
-                                        <div
-                                            key={task.id}
-                                            draggable
-                                            onDragStart={(e) => e.dataTransfer.setData("taskId", task.id)}
-                                            onDoubleClick={() => { setSelectedTask(task); setIsModalOpen(true); }}
-                                            className="bg-white p-3 my-2 rounded shadow cursor-grab relative"
-                                        >
-                                            <button onClick={(ev) => {
-                                                ev.stopPropagation();
-                                                // schedule deletion with undo
-                                                setTasks(prev => prev.filter(t => t.id !== task.id));
-                                                const timer = setTimeout(async () => {
-                                                    try { await api.del(`/tasks/${task.id}`); } catch (err) { console.error('Delete failed', err); showToast({ msg: 'Delete failed' }); }
-                                                    pendingDeletes.current.delete(task.id);
-                                                }, DELETE_TIMEOUT);
-                                                pendingDeletes.current.set(task.id, { timer, task });
-                                                showToast({
-                                                    msg: 'Task deleted', actionLabel: 'Undo', onAction: async () => {
-                                                        const entry = pendingDeletes.current.get(task.id);
-                                                        if (!entry) return;
-                                                        clearTimeout(entry.timer);
-                                                        // restore locally
-                                                        setTasks(prev => [entry.task, ...prev]);
+                                <div className="flex justify-between items-center mb-4 px-2">
+                                    <h4 className="uppercase text-xs font-bold text-gray-400 tracking-wider flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${col === 'Todo' ? 'bg-slate-400' : col === 'In Progress' ? 'bg-blue-400' : 'bg-emerald-400'}`}></div>
+                                        {col}
+                                    </h4>
+                                    <span className="text-xs font-semibold bg-gray-200 dark:bg-slate-700 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full">
+                                        {tasks.filter(t => t.status === col).length}
+                                    </span>
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                                    {tasks
+                                        .filter(t => !t.parentTaskId)
+                                        .filter(t => t.status === col)
+                                        .filter(t => {
+                                            if (!showMyTasks) return true;
+                                            return currentUser ? String(t.assigneeId) === String(currentUser.id) : true;
+                                        })
+                                        .map((task, idx) => (
+                                            <TaskCard
+                                                key={task.id}
+                                                task={task}
+                                                index={idx}
+                                                onDragStart={(e) => e.dataTransfer.setData("taskId", task.id)}
+                                                onClick={() => { setSelectedTask(task); setIsModalOpen(true); }}
+                                                onEdit={() => { setSelectedTask(task); setIsModalOpen(true); }}
+                                                onDelete={() => {
+                                                    setTasks(prev => prev.filter(t => t.id !== task.id));
+                                                    const timer = setTimeout(async () => {
+                                                        try { await api.del(`/tasks/${task.id}`); } catch (err) { console.error('Delete failed', err); showToast({ msg: 'Delete failed' }); }
                                                         pendingDeletes.current.delete(task.id);
-                                                        // try to restore on server as well (in case delete already executed)
-                                                        try {
-                                                            await api.post(`/tasks/${task.id}/restore`);
-                                                            showToast({ msg: 'Delete undone', duration: 2000 });
-                                                        } catch (err) {
-                                                            // still show undone locally; inform user if server restore failed
-                                                            console.error('Restore failed', err);
-                                                            showToast({ msg: 'Undo failed on server', duration: 3000 });
-                                                        }
-                                                    }, duration: DELETE_TIMEOUT
-                                                });
-                                            }} className="absolute top-2 right-2 text-red-500">
-                                                <Trash2 size={14} />
-                                            </button>
-                                            <strong>{task.title}</strong>
-                                            <div className="mt-2">
-                                                <button onClick={(ev) => { ev.stopPropagation(); setSelectedTask(task); setIsModalOpen(true); }} className="text-xs text-blue-600 inline-flex items-center gap-1">
-                                                    <Edit2 size={14} /> Edit
-                                                </button>
-                                            </div>
-                                            <p className="text-xs text-gray-600">{task.priority}</p>
-                                            <div className="flex flex-wrap gap-1 mt-2">
-                                                {Array.isArray(task.labels) && task.labels.map((l, i) => (
-                                                    <span key={i} className="text-[10px] uppercase font-bold text-gray-600 bg-gray-200 px-1.5 py-0.5 rounded">
-                                                        {l}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                            <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
-                                                <div className="flex items-center gap-1">
-                                                    <Calendar size={12} />
-                                                    {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No Date'}
-                                                </div>
-                                                <div className="text-blue-600 font-medium">
-                                                    {task.assignee?.name || 'Unassigned'}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                                    }, DELETE_TIMEOUT);
+                                                    pendingDeletes.current.set(task.id, { timer, task });
+                                                    showToast({
+                                                        msg: 'Task deleted', actionLabel: 'Undo', onAction: async () => {
+                                                            const entry = pendingDeletes.current.get(task.id);
+                                                            if (!entry) return;
+                                                            clearTimeout(entry.timer);
+                                                            setTasks(prev => [entry.task, ...prev]);
+                                                            pendingDeletes.current.delete(task.id);
+                                                            try {
+                                                                await api.post(`/tasks/${task.id}/restore`);
+                                                                showToast({ msg: 'Delete undone', duration: 2000 });
+                                                            } catch (err) {
+                                                                console.error('Restore failed', err);
+                                                                showToast({ msg: 'Undo failed on server', duration: 3000 });
+                                                            }
+                                                        }, duration: DELETE_TIMEOUT
+                                                    });
+                                                }}
+                                            />
+                                        ))}
+                                </div>
                             </div>
                         ))}
                     </div>
 
-                    <aside className="w-64 bg-white p-4 rounded shadow">
-                        <h4 className="text-lg font-semibold mb-2">Team Members</h4>
-                        {project ? (
-                            <div className="mb-3">
-                                <div className="text-sm text-gray-600">Project: <span className="font-medium">{project.name}</span></div>
-                                <div className="mt-2">
-                                    <div className="text-xs text-gray-500">Owner</div>
-                                    <div className="font-medium">{members.find(u => u.id === project.ownerId)?.name || 'Owner'}</div>
-                                </div>
-                                {project.teamLeaderId && (
-                                    <div className="mt-2">
-                                        <div className="text-xs text-gray-500">Team Leader</div>
-                                        <div className="font-medium">{members.find(u => u.id === project.teamLeaderId)?.name || 'Team Leader'}</div>
+                    <aside className="w-80 glass-panel p-5 rounded-2xl h-full border border-gray-100 dark:border-slate-800 flex flex-col shadow-sm">
+                        <div className="mb-6">
+                            <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-4">Project Details</h4>
+                            {project ? (
+                                <div className="space-y-4">
+                                    <div className="p-3 bg-blue-50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/30">
+                                        <div className="text-xs text-blue-500 font-semibold uppercase mb-1">Project Name</div>
+                                        <div className="font-semibold text-gray-800 dark:text-gray-100">{project.name}</div>
                                     </div>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="text-sm text-gray-500">Loading project...</div>
-                        )}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl">
+                                            <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Owner</div>
+                                            <div className="text-sm font-medium truncate" title={members.find(u => u.id === project.ownerId)?.name}>{members.find(u => u.id === project.ownerId)?.name || 'Owner'}</div>
+                                        </div>
+                                        {project.teamLeaderId && (
+                                            <div className="p-3 bg-gray-50 dark:bg-slate-800/50 rounded-xl">
+                                                <div className="text-[10px] text-gray-500 uppercase font-bold mb-1">Leader</div>
+                                                <div className="text-sm font-medium truncate" title={members.find(u => u.id === project.teamLeaderId)?.name}>{members.find(u => u.id === project.teamLeaderId)?.name || 'Leader'}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-sm text-gray-500 animate-pulse">Loading project details...</div>
+                            )}
+                        </div>
 
-                        <div>
-                            <div className="text-xs text-gray-500">Project Members</div>
+                        <div className="flex-1 overflow-hidden flex flex-col">
+                            <div className="flex justify-between items-center mb-3">
+                                <h4 className="text-sm font-bold text-gray-400 uppercase tracking-wider">Team Members</h4>
+                                <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-400 text-xs font-bold px-2 py-0.5 rounded-full">{members.length}</span>
+                            </div>
+
                             {canManageMembers() && (
-                                <div className="mt-2 flex gap-2">
-                                    <select value={newMemberId} onChange={e => setNewMemberId(e.target.value)} className="flex-1 p-2 border rounded">
-                                        <option value="">Add member...</option>
+                                <div className="mb-4 flex gap-2">
+                                    <select value={newMemberId} onChange={e => setNewMemberId(e.target.value)} className="flex-1 p-2 text-sm bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20">
+                                        <option value="">+ Add member...</option>
                                         {allUsers
                                             .filter(u => !members.find(m => String(m.id) === String(u.id)))
                                             .map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                     </select>
-                                    <button onClick={addMember} className="px-3 py-2 bg-green-600 text-white rounded">Add</button>
+                                    <button onClick={addMember} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors shadow-sm">Add</button>
                                 </div>
                             )}
 
-                            <ul className="mt-2 space-y-1">
-                                {members.map(u => (
-                                    <li key={u.id} className="flex items-center justify-between text-sm">
-                                        <span className={`${currentUser && u.id === currentUser.id ? 'font-semibold text-blue-600' : 'text-gray-700'}`}>{u.name}</span>
-                                        {canManageMembers() && String(u.id) !== String(project.ownerId) && (
-                                            <button onClick={() => removeMember(u.id)} className="text-red-500 text-xs">Remove</button>
-                                        )}
-                                    </li>
-                                ))}
-                            </ul>
+                            <div className="flex-1 overflow-y-auto -mx-2 px-2 custom-scrollbar">
+                                <ul className="space-y-2">
+                                    {members.map(u => (
+                                        <li key={u.id} className="flex items-center justify-between p-2 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-lg transition-colors group">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${currentUser && u.id === currentUser.id ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'}`}>
+                                                    {u.name?.[0]}
+                                                </div>
+                                                <span className={`text-sm ${currentUser && u.id === currentUser.id ? 'font-semibold text-blue-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                    {u.name}
+                                                    {currentUser && u.id === currentUser.id && <span className="text-[10px] bg-blue-50 text-blue-600 px-1 rounded ml-2">You</span>}
+                                                </span>
+                                            </div>
+                                            {canManageMembers() && String(u.id) !== String(project.ownerId) && (
+                                                <button onClick={() => removeMember(u.id)} className="text-gray-300 group-hover:text-red-500 transition-colors p-1" title="Remove Member">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                         </div>
                     </aside>
                 </div>
             </div>
             {isTrashOpen && <TrashModal projectId={id} onClose={() => setIsTrashOpen(false)} onUpdate={fetchTasks} />}
             {isModalOpen && <TaskModal task={selectedTask} projectId={id} onClose={() => { setIsModalOpen(false); setSelectedTask(null); }} onSave={() => { fetchTasks(); setSelectedTask(null); }} onDelete={(t) => {
-                // handle delete from modal with same undo flow
                 setIsModalOpen(false);
                 if (!t || !t.id) return;
                 setTasks(prev => prev.filter(x => x.id !== t.id));
@@ -313,5 +318,6 @@ const TaskBoard = () => {
             }} />}
         </>
     );
+
 };
 export default TaskBoard;

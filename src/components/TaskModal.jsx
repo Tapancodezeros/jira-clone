@@ -129,54 +129,59 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex justify-center items-center p-4 animate-in fade-in duration-300">
+            <div className="glass-panel w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden rounded-2xl shadow-2xl border border-gray-100/50 dark:border-slate-700/50 relative">
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-mono text-xs font-bold">
+                <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
+                    <div className="flex items-center gap-3">
+                        <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-lg font-mono text-xs font-bold tracking-tight">
                             {task ? `TASK-${task.id}` : 'NEW TASK'}
                         </span>
-                        <span>{projectId ? `Project #${projectId}` : 'Jira Clone'}</span>
+                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{projectId ? `Project #${projectId}` : 'Jira Clone'}</span>
                     </div>
                     <div className="flex gap-2">
                         {task && (
-                            <button onClick={handleDelete} className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-600 rounded transition-colors" title="Delete">
-                                <Trash2 size={18} />
+                            <button onClick={handleDelete} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors" title="Delete">
+                                <Trash2 size={20} />
                             </button>
                         )}
-                        <button onClick={onClose} className="p-2 hover:bg-gray-200 text-gray-500 rounded transition-colors" title="Close">
-                            <X size={20} />
+                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 rounded-lg transition-colors" title="Close">
+                            <X size={22} />
                         </button>
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
                     {/* Main Content */}
-                    <div className="flex-1 overflow-y-auto p-6 md:p-8">
+                    <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                         <input
                             type="text"
-                            className="text-2xl font-bold text-gray-900 w-full bg-transparent outline-none placeholder-gray-400 mb-6"
+                            className="text-3xl font-bold text-gray-900 dark:text-white w-full bg-transparent outline-none placeholder-gray-400 dark:placeholder-gray-600 mb-8 leading-tight"
                             placeholder="Task Summary"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                         />
 
                         {/* Tabs */}
-                        <div className="flex items-center gap-6 border-b mb-6 border-gray-100">
-                            <button onClick={() => setActiveTab('details')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'details' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Details</button>
-                            <button onClick={() => setActiveTab('subtasks')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'subtasks' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Subtasks</button>
-                            <button onClick={() => setActiveTab('comments')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'comments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Comments</button>
-                            <button onClick={() => setActiveTab('history')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>History</button>
+                        <div className="flex items-center gap-8 border-b border-gray-200/60 dark:border-slate-700/60 mb-8">
+                            {['details', 'subtasks', 'comments', 'history'].map(tab => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={`pb-3 text-sm font-bold border-b-2 transition-all capitalize ${activeTab === tab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
                         </div>
 
                         {activeTab === 'details' && (
-                            <div className="mb-6 animate-in fade-in duration-200">
-                                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
+                            <div className="mb-6 animate-in fade-in duration-300">
+                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
                                     <AlignLeft size={16} /> Description
                                 </label>
                                 <textarea
-                                    className="w-full min-h-[200px] p-4 bg-gray-50 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none text-sm leading-relaxed"
+                                    className="w-full min-h-[250px] p-4 bg-gray-50/50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/50 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-slate-900 outline-none resize-none text-sm leading-relaxed text-gray-800 dark:text-gray-200 transition-all"
                                     placeholder="Add a more detailed description..."
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -184,9 +189,9 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                             </div>
                         )}
                         {activeTab === 'subtasks' && (
-                            <div className="animate-in fade-in duration-200">
+                            <div className="animate-in fade-in duration-300">
                                 <div className="space-y-3 mb-6">
-                                    {subtasks.length === 0 && <p className="text-gray-500 text-sm italic py-2">No subtasks yet</p>}
+                                    {subtasks.length === 0 && <div className="text-gray-400 text-sm text-center py-8 bg-gray-50/30 dark:bg-slate-800/30 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">No subtasks yet. Break it down!</div>}
                                     {subtasks.map(st => (
                                         <div
                                             key={st.id}
@@ -200,24 +205,23 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                     showToast({ msg: 'Failed to update subtask' });
                                                 }
                                             }}
-                                            className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200 shadow-sm hover:border-blue-300 transition-all cursor-pointer"
+                                            className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800/80 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
                                         >
-                                            <div className={`w-5 h-5 rounded flex items-center justify-center border ${st.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-gray-300 bg-gray-50'}`}>
-                                                {st.status === 'Done' && <CheckSquare size={12} className="text-white" />}
+                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all ${st.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700'}`}>
+                                                {st.status === 'Done' && <CheckSquare size={14} className="text-white" />}
                                             </div>
-                                            <span className={`text-sm flex-1 ${st.status === 'Done' ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'}`}>{st.title}</span>
+                                            <span className={`text-sm flex-1 font-medium transition-colors ${st.status === 'Done' ? 'text-gray-400 line-through dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>{st.title}</span>
 
-                                            <div className="flex items-center gap-2">
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${st.priority === 'High' || st.priority === 'Critical' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-gray-100 text-gray-500 border border-gray-200'}`}>{st.priority}</span>
-                                                <span className="text-xs text-gray-500 bg-gray-50 px-2 py-0.5 rounded border border-gray-200">{st.status}</span>
+                                            <div className="flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${st.priority === 'High' || st.priority === 'Critical' ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400'}`}>{st.priority}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                     <input
                                         type="text"
-                                        className="flex-1 bg-white border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
+                                        className="flex-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none shadow-sm transition-all text-gray-800 dark:text-gray-200"
                                         placeholder="What needs to be done?"
                                         value={newSubtaskTitle}
                                         onChange={e => setNewSubtaskTitle(e.target.value)}
@@ -225,26 +229,26 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     />
                                     <button
                                         onClick={handleAddSubtask}
-                                        className="bg-blue-600 text-white hover:bg-blue-700 px-5 py-2 rounded-lg text-sm font-semibold transition-colors shadow-sm"
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-lg shadow-blue-500/30 active:scale-95"
                                     >
-                                        Add Subtask
+                                        Add
                                     </button>
                                 </div>
                             </div>
                         )}
                         {activeTab === 'comments' && (
-                            <div className="animate-in fade-in duration-200">
-                                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                                    <div className="flex gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0">YOU</div>
+                            <div className="animate-in fade-in duration-300">
+                                <div className="bg-gray-50/50 dark:bg-slate-800/50 rounded-xl p-5 mb-8 border border-gray-100 dark:border-slate-700">
+                                    <div className="flex gap-4">
+                                        <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0 shadow-sm border border-blue-200 dark:border-blue-800">YOU</div>
                                         <div className="flex-1">
                                             <textarea
                                                 placeholder="Add a comment..."
-                                                className="w-full bg-white border border-gray-200 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none min-h-[80px]"
+                                                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none min-h-[80px] transition-all text-gray-800 dark:text-gray-200 placeholder-gray-400"
                                                 value={newComment}
                                                 onChange={e => setNewComment(e.target.value)}
                                             ></textarea>
-                                            <div className="flex justify-end mt-2 gap-2">
+                                            <div className="flex justify-end mt-3">
                                                 <button onClick={async () => {
                                                     if (!newComment.trim() || !task) return;
                                                     try {
@@ -252,24 +256,26 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                         setNewComment('');
                                                         fetchComments(task.id);
                                                     } catch (err) { console.error(err); }
-                                                }} className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700">Save</button>
+                                                }} className="px-5 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all">Comment</button>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                                 <div className="space-y-6">
-                                    {comments.length === 0 && <p className="text-gray-500 text-sm text-center">No comments yet</p>}
+                                    {comments.length === 0 && <p className="text-gray-400 text-sm text-center italic">No comments yet.</p>}
                                     {comments.map(c => (
-                                        <div key={c.id} className="flex gap-3 group">
-                                            <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs shrink-0">
+                                        <div key={c.id} className="flex gap-4 group animate-in fade-in slide-in-from-bottom-2">
+                                            <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0 shadow-sm border border-indigo-200 dark:border-indigo-800">
                                                 {c.author?.name?.substring(0, 2)?.toUpperCase() || '??'}
                                             </div>
                                             <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-sm font-semibold text-gray-900">{c.author?.name || 'Unknown'}</span>
-                                                    <span className="text-xs text-gray-500">{new Date(c.createdAt).toLocaleString()}</span>
+                                                <div className="flex items-center gap-2 mb-1.5">
+                                                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{c.author?.name || 'Unknown'}</span>
+                                                    <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleString()}</span>
                                                 </div>
-                                                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{c.content}</p>
+                                                <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-800/50 p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl border border-gray-100 dark:border-slate-700/50 shadow-sm inline-block max-w-[90%]">
+                                                    {c.content}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}
@@ -277,14 +283,16 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                             </div>
                         )}
                         {activeTab === 'history' && (
-                            <div className="animate-in fade-in duration-200 space-y-4">
-                                {activities.length === 0 && <p className="text-gray-500 text-sm text-center">No history yet</p>}
-                                {activities.map(a => (
-                                    <div key={a.id} className="flex gap-3 items-start border-l-2 border-gray-200 pl-4 py-1">
-                                        <div className="text-sm text-gray-600">
-                                            <span className="font-semibold text-gray-900">{a.actor?.name || 'Someone'}</span>
+                            <div className="animate-in fade-in duration-300 space-y-4">
+                                {activities.length === 0 && <p className="text-gray-400 text-sm text-center italic">No history yet.</p>}
+                                {activities.map((a, i) => (
+                                    <div key={a.id} className="flex gap-4 items-start pl-2 relative" style={{ animationDelay: `${i * 0.05}s` }}>
+                                        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gray-100 dark:bg-slate-800 ml-[5px]"></div>
+                                        <div className="w-3 h-3 rounded-full bg-blue-400 ring-4 ring-white dark:ring-slate-900 z-10 mt-1.5"></div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-slate-800/30 p-2 rounded-lg flex-1">
+                                            <span className="font-bold text-gray-900 dark:text-gray-200">{a.actor?.name || 'Someone'}</span>
                                             <span className="mx-1">{a.description}</span>
-                                            <div className="text-xs text-gray-400 mt-0.5">{new Date(a.createdAt).toLocaleString()}</div>
+                                            <div className="text-xs text-gray-400 mt-1 font-medium">{new Date(a.createdAt).toLocaleString()}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -293,32 +301,38 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                     </div>
 
                     {/* Sidebar */}
-                    <div className="w-full md:w-80 bg-gray-50 border-l p-6 overflow-y-auto">
-                        <div className="space-y-6">
+                    <div className="w-full md:w-80 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-md border-l border-gray-200 dark:border-slate-700 p-6 overflow-y-auto section-glass">
+                        <div className="space-y-8">
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Status</label>
-                                <select
-                                    className="w-full p-2 bg-white border border-gray-200 rounded-md text-sm outline-none focus:border-blue-500 shadow-sm font-medium"
-                                    value={status}
-                                    onChange={(e) => setStatus(e.target.value)}
-                                >
-                                    <option value="Todo">Todo</option>
-                                    <option value="In Progress">In Progress</option>
-                                    <option value="Done">Done</option>
-                                </select>
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 block">Status</label>
+                                <div className="relative">
+                                    <select
+                                        className="w-full p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm font-semibold appearance-none text-gray-700 dark:text-gray-200 hover:border-blue-400 transition-colors"
+                                        value={status}
+                                        onChange={(e) => setStatus(e.target.value)}
+                                    >
+                                        <option value="Todo">Todo</option>
+                                        <option value="In Progress">In Progress</option>
+                                        <option value="Done">Done</option>
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
+                                </div>
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Details</label>
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Flag size={14} /> Priority
+                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 block">Attributes</label>
+                                <div className="space-y-5">
+                                    <div className="flex items-center justify-between group">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            <Flag size={16} className="text-gray-400" /> Priority
                                         </div>
                                         <select
                                             value={priority}
                                             onChange={(e) => setPriority(e.target.value)}
-                                            className="bg-transparent text-sm font-medium outline-none text-right cursor-pointer hover:bg-gray-200 rounded px-1"
+                                            className={`text-sm font-bold outline-none text-right cursor-pointer rounded-lg px-2 py-1 transition-colors ${priority === 'High' ? 'text-red-600 bg-red-50 dark:bg-red-900/20' :
+                                                    priority === 'Medium' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' :
+                                                        'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                                                }`}
                                         >
                                             <option value="Low">Low</option>
                                             <option value="Medium">Medium</option>
@@ -326,54 +340,45 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                             <option value="Critical">Critical</option>
                                         </select>
                                     </div>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <User size={14} /> Assignee
+                                    <div className="flex items-center justify-between group">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            <User size={16} className="text-gray-400" /> Assignee
                                         </div>
                                         <select
                                             value={assigneeId}
                                             onChange={(e) => setAssigneeId(e.target.value)}
-                                            className="bg-transparent text-sm font-medium outline-none text-right cursor-pointer hover:bg-gray-200 rounded px-1 w-32 truncate"
+                                            className="bg-transparent text-sm font-medium outline-none text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700/50 rounded px-2 py-1 w-40 truncate text-gray-800 dark:text-gray-200 transition-colors"
                                         >
                                             <option value="">Unassigned</option>
                                             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                         </select>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <User size={14} /> Reporter
+                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            <User size={16} className="text-gray-400" /> Reporter
                                         </div>
-                                        <span className="text-sm font-medium text-gray-800">
+                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 px-2 py-1">
                                             {task?.reporter?.name || 'Unknown'}
                                         </span>
                                     </div>
-                                    {/* Mock Dates */}
-                                    <div className="flex items-center justify-between pt-2">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Calendar size={14} /> Created
-                                        </div>
-                                        <span className="text-sm text-gray-800">
-                                            {task?.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'Today'}
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                                            <Calendar size={14} /> Due Date
+                                    <div className="flex items-center justify-between pt-2 border-t border-dashed border-gray-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            <Calendar size={16} className="text-gray-400" /> Due Date
                                         </div>
                                         <input
                                             type="date"
-                                            className="text-sm bg-transparent outline-none text-right cursor-pointer"
+                                            className="text-sm bg-transparent outline-none text-right cursor-pointer font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded px-2 py-1 transition-colors"
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
                                         />
                                     </div>
 
-                                    <div className="pt-4">
-                                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 block">Labels</label>
+                                    <div className="pt-6">
+                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Labels</label>
                                         <input
                                             type="text"
                                             placeholder="e.g. Bug, Frontend"
-                                            className="w-full text-sm p-2 border rounded"
+                                            className="w-full text-sm p-3 border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
                                             value={labels}
                                             onChange={e => setLabels(e.target.value)}
                                         />
@@ -381,15 +386,15 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                 </div>
                             </div>
 
-                            <div className="pt-6 border-t">
+                            <div className="pt-6 border-t border-gray-200 dark:border-slate-700 mt-auto">
                                 <button
                                     onClick={handleSubmit}
                                     disabled={isLoading}
-                                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-all shadow-sm"
+                                    className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                                 >
                                     {isLoading ? 'Saving...' : (
                                         <>
-                                            <Save size={16} /> Save Changes
+                                            <Save size={18} /> Save Changes
                                         </>
                                     )}
                                 </button>

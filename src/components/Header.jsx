@@ -108,13 +108,13 @@ const Header = () => {
     };
 
     return (
-        <header className="px-6 py-3 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-slate-800 flex justify-between items-center sticky top-0 z-40 shadow-sm transition-colors duration-200">
+        <header className="px-6 py-4 glass-panel border-b border-gray-200/50 dark:border-slate-800/50 flex justify-between items-center sticky top-0 z-40 transition-all duration-300">
             {/* Logo Section */}
-            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => navigate('/dashboard')}>
-                <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg group-hover:bg-blue-700 transition-colors">
-                    <Home size={18} />
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/dashboard')}>
+                <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300">
+                    <Home size={20} className="drop-shadow-sm" />
                 </div>
-                <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400">
+                <h3 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-600 dark:from-white dark:to-slate-300 tracking-tight">
                     Jira Clone
                 </h3>
             </div>
@@ -125,25 +125,25 @@ const Header = () => {
                 <input
                     type="text"
                     placeholder="Search tasks, projects..."
-                    className="w-full pl-10 pr-4 py-2 bg-gray-100 dark:bg-slate-800 border-none rounded-full text-sm focus:ring-2 focus:ring-blue-500 focus:bg-white dark:focus:bg-slate-900 transition-all outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 bg-slate-100 dark:bg-slate-800/50 border border-transparent focus:border-blue-500/30 rounded-full text-sm focus:ring-4 focus:ring-blue-500/10 focus:bg-white dark:focus:bg-slate-900 transition-all outline-none"
                 />
             </div>
 
             {/* Right Actions */}
-            <div className="flex items-center gap-5">
-                <button onClick={handleToggleTheme} className="text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 p-2 rounded-full transition-colors">
+            <div className="flex items-center gap-4">
+                <button onClick={handleToggleTheme} className="text-gray-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-2.5 rounded-full transition-all hover:scale-110 active:scale-95">
                     {theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
                 </button>
 
                 <div className="relative" ref={notifRef}>
                     <button
                         onClick={() => setShowNotifs((s) => !s)}
-                        className="relative text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-800 p-2 rounded-full transition-colors"
+                        className="relative text-gray-500 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-2.5 rounded-full transition-all hover:scale-110 active:scale-95"
                         aria-label="Notifications"
                     >
                         <Bell size={20} />
                         {notifications.filter((n) => !n.read).length > 0 && (
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+                            <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-pulse"></span>
                         )}
                     </button>
 
