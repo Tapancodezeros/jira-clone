@@ -205,6 +205,34 @@ router.post('/:id/comments', authMiddleware, async (req, res) => {
             description: 'added a comment'
         });
 
+        // Handle @mentions
+        const mentionRegex = /@\[([a-zA-Z0-9_ ]+)\]/g;
+        const matches = [...content.matchAll(mentionRegex)];
+
+        if (matches.length > 0) {
+            const mentionedNames = matches.map(m => m[1].trim());
+            // Find users matching the names
+            const { Op } = require('sequelize');
+            const mentionedUsers = await User.findAll({
+                where: {
+                    name: { [Op.in]: mentionedNames },
+                    id: { [Op.ne]: req.user.id } // Don't notify self
+                }
+            });
+
+            const task = await Task.findByPk(req.params.id);
+
+            for (const user of mentionedUsers) {
+                await Notification.create({
+                    userId: user.id,
+                    title: 'You were mentioned',
+                    message: `${req.user.name} mentioned you in a comment on task: ${task.title}`,
+                    type: 'mention',
+                    link: `/project/${task.projectId}` // Ideally deep link to task
+                });
+            }
+        }
+
         res.status(201).json(fullComment);
     } catch (error) { res.status(500).json({ message: error.message }); }
 });

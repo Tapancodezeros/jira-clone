@@ -18,6 +18,9 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [newComment, setNewComment] = useState('');
     const [subtasks, setSubtasks] = useState([]);
     const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+    const [isCommentFocused, setIsCommentFocused] = useState(false);
+    const [showMentionList, setShowMentionList] = useState(false);
+    const [mentionFilter, setMentionFilter] = useState('');
 
     // For now simple single tag, later can be array
     const [activeTab, setActiveTab] = useState('details');
@@ -238,26 +241,115 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         )}
                         {activeTab === 'comments' && (
                             <div className="animate-in fade-in duration-300">
-                                <div className="bg-gray-50/50 dark:bg-slate-800/50 rounded-xl p-5 mb-8 border border-gray-100 dark:border-slate-700">
-                                    <div className="flex gap-4">
-                                        <div className="w-9 h-9 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0 shadow-sm border border-blue-200 dark:border-blue-800">YOU</div>
-                                        <div className="flex-1">
-                                            <textarea
-                                                placeholder="Add a comment..."
-                                                className="w-full bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none min-h-[80px] transition-all text-gray-800 dark:text-gray-200 placeholder-gray-400"
-                                                value={newComment}
-                                                onChange={e => setNewComment(e.target.value)}
-                                            ></textarea>
-                                            <div className="flex justify-end mt-3">
-                                                <button onClick={async () => {
-                                                    if (!newComment.trim() || !task) return;
-                                                    try {
-                                                        await api.post(`/tasks/${task.id}/comments`, { content: newComment });
-                                                        setNewComment('');
-                                                        fetchComments(task.id);
-                                                    } catch (err) { console.error(err); }
-                                                }} className="px-5 py-2 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all">Comment</button>
+                                <div className={`bg-white dark:bg-slate-900 border transition-all duration-200 ${isCommentFocused ? 'border-blue-500 ring-4 ring-blue-500/10 rounded-xl shadow-lg p-4' : 'border-gray-200 dark:border-slate-700 rounded-[20px] p-0 hover:border-gray-300 dark:hover:border-slate-600'}`}>
+                                    <div className={`flex gap-4 ${isCommentFocused ? '' : 'p-2 mb-0'}`}>
+                                        {!isCommentFocused && (
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0 ml-1 mt-1">
+                                                YOU
                                             </div>
+                                        )}
+                                        <div className="flex-1">
+                                            {isCommentFocused && (
+                                                <div className="flex items-center gap-1 mb-2 pb-2 border-b border-gray-100 dark:border-slate-800 text-gray-400">
+                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors" title="Bold"><strong>B</strong></button>
+                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors italic" title="Italic"><em>I</em></button>
+                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors underline decoration-solid" title="Underline">U</button>
+                                                    <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div>
+                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors" title="List"><AlignLeft size={14} /></button>
+                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors" title="Code">{'< >'}</button>
+                                                </div>
+                                            )}
+                                            <div className="relative">
+                                                <textarea
+                                                    placeholder={isCommentFocused ? "Add a comment..." : "Add a comment..."}
+                                                    onFocus={() => setIsCommentFocused(true)}
+                                                    className={`w-full bg-transparent outline-none text-sm text-gray-800 dark:text-gray-200 placeholder-gray-500 resize-none transition-all ${isCommentFocused ? 'min-h-[120px]' : 'min-h-[40px] pt-2.5 ml-1'}`}
+                                                    value={newComment}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        setNewComment(val);
+
+                                                        // Simple mention detection: last word starts with @
+                                                        const cursorPos = e.target.selectionStart;
+                                                        const textBeforeCursor = val.slice(0, cursorPos);
+                                                        const words = textBeforeCursor.split(/\s/);
+                                                        const lastWord = words[words.length - 1];
+
+                                                        if (lastWord.startsWith('@')) {
+                                                            const query = lastWord.slice(1).toLowerCase();
+                                                            setMentionFilter(query);
+                                                            setShowMentionList(true);
+                                                        } else {
+                                                            setShowMentionList(false);
+                                                        }
+                                                    }}
+                                                ></textarea>
+
+                                                {showMentionList && (
+                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                                        <div className="px-3 py-2 bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 text-xs font-bold text-gray-500 uppercase">
+                                                            Mention User
+                                                        </div>
+                                                        <div className="max-h-48 overflow-y-auto">
+                                                            {users.filter(u => u.name.toLowerCase().includes(mentionFilter)).map(u => (
+                                                                <button
+                                                                    key={u.id}
+                                                                    onClick={() => {
+                                                                        const cursorPos = document.querySelector('textarea').selectionStart;
+                                                                        const textBeforeCursor = newComment.slice(0, cursorPos);
+                                                                        const words = textBeforeCursor.split(/\s/);
+                                                                        words.pop(); // remove incomplete mention
+                                                                        const pre = words.join(' ');
+                                                                        const post = newComment.slice(cursorPos);
+
+                                                                        const insertedStart = pre ? `${pre} @[${u.name}] ` : `@[${u.name}] `;
+                                                                        setNewComment(insertedStart + post);
+                                                                        setShowMentionList(false);
+                                                                        document.querySelector('textarea').focus();
+                                                                    }}
+                                                                    className="w-full text-left px-4 py-2.5 hover:bg-blue-50 dark:hover:bg-slate-700/50 flex items-center gap-3 transition-colors"
+                                                                >
+                                                                    <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold">
+                                                                        {u.name.charAt(0)}
+                                                                    </div>
+                                                                    <span className="text-sm text-gray-700 dark:text-gray-200">{u.name}</span>
+                                                                </button>
+                                                            ))}
+                                                            {users.filter(u => u.name.toLowerCase().includes(mentionFilter)).length === 0 && (
+                                                                <div className="p-3 text-center text-gray-400 text-sm italic">No users found</div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {isCommentFocused && (
+                                                <div className="flex items-center justify-between mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                                    <span className="text-xs text-gray-400 font-medium"><strong>Pro tip:</strong> press <kbd className="bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700 font-sans">M</kbd> to comment</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => setIsCommentFocused(false)}
+                                                            className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                                        >
+                                                            Cancel
+                                                        </button>
+                                                        <button
+                                                            onClick={async () => {
+                                                                if (!newComment.trim() || !task) return;
+                                                                try {
+                                                                    await api.post(`/tasks/${task.id}/comments`, { content: newComment });
+                                                                    setNewComment('');
+                                                                    fetchComments(task.id);
+                                                                    setIsCommentFocused(false);
+                                                                } catch (err) { console.error(err); }
+                                                            }}
+                                                            className="px-4 py-2 text-sm font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all"
+                                                        >
+                                                            Save
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -274,7 +366,13 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                     <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleString()}</span>
                                                 </div>
                                                 <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-800/50 p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl border border-gray-100 dark:border-slate-700/50 shadow-sm inline-block max-w-[90%]">
-                                                    {c.content}
+                                                    {c.content.split(/(@\[[^\]]+\])/g).map((part, i) => {
+                                                        const match = part.match(/@\[([^\]]+)\]/);
+                                                        if (match) {
+                                                            return <span key={i} className="font-bold text-blue-600 dark:text-blue-400">@{match[1]}</span>;
+                                                        }
+                                                        return part;
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>
@@ -330,8 +428,8 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                             value={priority}
                                             onChange={(e) => setPriority(e.target.value)}
                                             className={`text-sm font-bold outline-none text-right cursor-pointer rounded-lg px-2 py-1 transition-colors ${priority === 'High' ? 'text-red-600 bg-red-50 dark:bg-red-900/20' :
-                                                    priority === 'Medium' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' :
-                                                        'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
+                                                priority === 'Medium' ? 'text-orange-600 bg-orange-50 dark:bg-orange-900/20' :
+                                                    'text-blue-600 bg-blue-50 dark:bg-blue-900/20'
                                                 }`}
                                         >
                                             <option value="Low">Low</option>
