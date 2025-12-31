@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, Calendar, Tag, CheckSquare } from 'lucide-react';
+import { Edit2, Trash2, Calendar, Tag, CheckSquare, Bug, BookOpen, Zap, Hash } from 'lucide-react';
 
 export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDragStart }) {
     return (
@@ -29,11 +29,17 @@ export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDra
 
             <div className="flex items-start gap-3 mb-2.5">
                 <span className={`w-1 self-stretch rounded-full ${task.priority === 'High' || task.priority === 'Critical' ? 'bg-red-500' :
-                        task.priority === 'Medium' ? 'bg-orange-400' :
-                            task.priority === 'Low' ? 'bg-blue-400' : 'bg-slate-300'
+                    task.priority === 'Medium' ? 'bg-orange-400' :
+                        task.priority === 'Low' ? 'bg-blue-400' : 'bg-slate-300'
                     }`}></span>
                 <div className="flex-1 min-w-0">
-                    <strong className="text-gray-800 dark:text-gray-100 text-sm font-bold leading-snug block line-clamp-2 mb-1">{task.title}</strong>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                        {task.issueType === 'Bug' && <Bug size={12} className="text-red-500 shrink-0" />}
+                        {task.issueType === 'Story' && <BookOpen size={12} className="text-green-600 shrink-0" />}
+                        {task.issueType === 'Epic' && <Zap size={12} className="text-purple-600 shrink-0" />}
+                        {(!task.issueType || task.issueType === 'Task') && <CheckSquare size={12} className="text-blue-500 shrink-0" />}
+                        <strong className="text-gray-800 dark:text-gray-100 text-sm font-bold leading-snug block line-clamp-2">{task.title}</strong>
+                    </div>
                     {task.description && <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-1">{task.description}</p>}
                 </div>
             </div>
@@ -41,8 +47,8 @@ export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDra
             <div className="flex flex-wrap gap-1.5 mb-3">
                 {task.priority && (
                     <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded border ${task.priority === 'High' || task.priority === 'Critical' ? 'text-red-600 bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-900' :
-                            task.priority === 'Medium' ? 'text-orange-600 bg-orange-50 border-orange-100 dark:bg-orange-900/20 dark:border-orange-900' :
-                                'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-900'
+                        task.priority === 'Medium' ? 'text-orange-600 bg-orange-50 border-orange-100 dark:bg-orange-900/20 dark:border-orange-900' :
+                            'text-blue-600 bg-blue-50 border-blue-100 dark:bg-blue-900/20 dark:border-blue-900'
                         }`}>
                         {task.priority}
                     </span>
@@ -52,6 +58,11 @@ export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDra
                         <Tag size={8} /> {l}
                     </span>
                 ))}
+                {task.storyPoints != null && (
+                    <span className="text-[10px] font-bold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-full border border-gray-300 dark:border-slate-600 flex items-center gap-1" title="Story Points">
+                        {task.storyPoints}
+                    </span>
+                )}
             </div>
 
             <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 dark:border-slate-800/50">

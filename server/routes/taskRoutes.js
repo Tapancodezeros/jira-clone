@@ -37,6 +37,8 @@ router.post('/', authMiddleware, async (req, res) => {
             dueDate: dueDate || null,
             labels: labels || [],
             parentTaskId: parentTaskId || null,
+            storyPoints: req.body.storyPoints || null,
+            issueType: req.body.issueType || 'Task',
             reporterId: req.user.id
         });
 

@@ -18,7 +18,14 @@ const Task = sequelize.define('Task', {
     projectId: { type: DataTypes.INTEGER, allowNull: false },
     dueDate: { type: DataTypes.DATEONLY, allowNull: true },
     labels: { type: DataTypes.JSON, defaultValue: [] },
-    parentTaskId: { type: DataTypes.INTEGER, allowNull: true }
+    parentTaskId: { type: DataTypes.INTEGER, allowNull: true },
+    storyPoints: { type: DataTypes.INTEGER, allowNull: true },
+    issueType: {
+        type: DataTypes.ENUM('Story', 'Task', 'Bug', 'Epic'), // Jira-like issue types
+        defaultValue: 'Task'
+    },
+    originalEstimate: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 0 }, // in minutes
+    timeSpent: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 0 } // in minutes
 }, {
     paranoid: true,
     timestamps: true

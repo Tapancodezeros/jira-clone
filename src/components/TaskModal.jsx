@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/apiClient';
 import { useToast } from '../context/ToastContext';
-import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare } from 'lucide-react';
+import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash } from 'lucide-react';
 
 const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [title, setTitle] = useState('');
@@ -10,7 +10,9 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [status, setStatus] = useState('Todo');
     const [priority, setPriority] = useState('Medium');
     const [dueDate, setDueDate] = useState('');
-    const [labels, setLabels] = useState(''); // comma separated string for simple input
+    const [labels, setLabels] = useState('');
+    const [issueType, setIssueType] = useState('Task');
+    const [storyPoints, setStoryPoints] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [users, setUsers] = useState([]);
     const [comments, setComments] = useState([]);
@@ -21,6 +23,9 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [isCommentFocused, setIsCommentFocused] = useState(false);
     const [showMentionList, setShowMentionList] = useState(false);
     const [mentionFilter, setMentionFilter] = useState('');
+    const [originalEstimate, setOriginalEstimate] = useState('');
+    const [timeSpent, setTimeSpent] = useState('');
+
 
     // For now simple single tag, later can be array
     const [activeTab, setActiveTab] = useState('details');
@@ -89,6 +94,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setPriority(task.priority || 'Medium');
             setDueDate(task.dueDate || '');
             setLabels(Array.isArray(task.labels) ? task.labels.join(', ') : '');
+            setIssueType(task.issueType || 'Task');
+            setIssueType(task.issueType || 'Task');
+            setStoryPoints(task.storyPoints || '');
+            setOriginalEstimate(task.originalEstimate || '');
+            setTimeSpent(task.timeSpent || '');
         } else {
             setTitle('');
             setDescription('');
@@ -98,6 +108,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setPriority('Medium');
             setDueDate('');
             setLabels('');
+            setIssueType('Task');
+            setIssueType('Task');
+            setStoryPoints('');
+            setOriginalEstimate('');
+            setTimeSpent('');
         }
     }, [task]);
 
@@ -106,7 +121,15 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
         setIsLoading(true);
         try {
             const labelArray = labels.split(',').map(l => l.trim()).filter(l => l);
-            const payload = { title, description, projectId, assigneeId, status, priority, dueDate: dueDate || null, labels: labelArray };
+            const payload = {
+                title, description, projectId, assigneeId, status, priority,
+                dueDate: dueDate || null,
+                labels: labelArray,
+                issueType,
+                storyPoints: storyPoints ? parseInt(storyPoints) : null,
+                originalEstimate: originalEstimate ? parseInt(originalEstimate) : 0,
+                timeSpent: timeSpent ? parseInt(timeSpent) : 0
+            };
             if (task && task.id) {
                 await api.put(`/tasks/${task.id}`, payload);
             } else {
@@ -137,6 +160,24 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
+                        <div className="flex items-center bg-white dark:bg-slate-700 rounded-md border border-gray-200 dark:border-slate-600 p-1">
+                            <select
+                                value={issueType}
+                                onChange={e => setIssueType(e.target.value)}
+                                className="bg-transparent text-xs font-bold uppercase text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+                            >
+                                <option value="Task">Task</option>
+                                <option value="Bug">Bug</option>
+                                <option value="Story">Story</option>
+                                <option value="Epic">Epic</option>
+                            </select>
+                            <div className="ml-1">
+                                {issueType === 'Bug' && <Bug size={14} className="text-red-500" />}
+                                {issueType === 'Task' && <CheckSquare size={14} className="text-blue-500" />}
+                                {issueType === 'Story' && <BookOpen size={14} className="text-green-600" />}
+                                {issueType === 'Epic' && <Zap size={14} className="text-purple-600" />}
+                            </div>
+                        </div>
                         <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-lg font-mono text-xs font-bold tracking-tight">
                             {task ? `TASK-${task.id}` : 'NEW TASK'}
                         </span>
@@ -298,7 +339,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                                         const cursorPos = document.querySelector('textarea').selectionStart;
                                                                         const textBeforeCursor = newComment.slice(0, cursorPos);
                                                                         const words = textBeforeCursor.split(/\s/);
-                                                                        words.pop(); // remove incomplete mention
+                                                                        words.pop();
                                                                         const pre = words.join(' ');
                                                                         const post = newComment.slice(cursorPos);
 
@@ -440,6 +481,18 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     </div>
                                     <div className="flex items-center justify-between group">
                                         <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
+                                            <Hash size={16} className="text-gray-400" /> Story Points
+                                        </div>
+                                        <input
+                                            type="number"
+                                            className="text-sm font-bold bg-gray-100 dark:bg-slate-800 border-none rounded-lg w-16 text-center py-1 outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-800 dark:text-gray-200"
+                                            placeholder="-"
+                                            value={storyPoints}
+                                            onChange={e => setStoryPoints(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between group">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
                                             <User size={16} className="text-gray-400" /> Assignee
                                         </div>
                                         <select
@@ -480,6 +533,45 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                             value={labels}
                                             onChange={e => setLabels(e.target.value)}
                                         />
+                                    </div>
+
+                                    <div className="pt-6">
+                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Time Tracking</label>
+                                        <div className="space-y-3">
+                                            {originalEstimate > 0 && (
+                                                <div className="mb-2">
+                                                    <div className="flex justify-between text-xs mb-1 text-gray-500">
+                                                        <span>Progress</span>
+                                                        <span>{Math.round((parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%</span>
+                                                    </div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 overflow-hidden">
+                                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%` }}></div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Est. (m)</label>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Min"
+                                                        className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        value={originalEstimate}
+                                                        onChange={e => setOriginalEstimate(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Spent (m)</label>
+                                                    <input
+                                                        type="number"
+                                                        placeholder="Min"
+                                                        className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                        value={timeSpent}
+                                                        onChange={e => setTimeSpent(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
