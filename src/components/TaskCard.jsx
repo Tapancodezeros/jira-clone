@@ -65,6 +65,15 @@ export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDra
                 )}
             </div>
 
+            {task.originalEstimate > 0 && (
+                <div className="w-full h-1 bg-gray-100 dark:bg-slate-800 rounded-full mb-3 overflow-hidden">
+                    <div
+                        className={`h-full rounded-full ${task.timeSpent > task.originalEstimate ? 'bg-red-500' : 'bg-green-500'}`}
+                        style={{ width: `${Math.min(100, ((task.timeSpent || 0) / task.originalEstimate) * 100)}%` }}
+                    ></div>
+                </div>
+            )}
+
             <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 dark:border-slate-800/50">
                 <div className="flex items-center gap-2">
                     {task.dueDate && (

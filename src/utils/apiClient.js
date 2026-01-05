@@ -1,11 +1,22 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// 1. Get the domain (Localhost or Live)
+// If you are on Vercel, it uses VITE_API_URL. If local, it uses localhost:5000.
+const DOMAIN = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
+// 2. Remove trailing slash from DOMAIN if it exists, then append /api
+// This prevents errors like "http://site.com//api"
+const API_BASE = `${DOMAIN.replace(/\/$/, '')}/api`;
 
 function getToken() {
   try { return localStorage.getItem('token'); } catch (e) { return null; }
 }
 
 async function request(path, options = {}) {
-  const url = path.startsWith('http') ? path : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  // If the path is a full URL (starts with http), use it as is. 
+  // Otherwise, attach it to API_BASE.
+  const url = path.startsWith('http') 
+    ? path 
+    : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+    
   const headers = options.headers || {};
   const token = getToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -15,6 +26,7 @@ async function request(path, options = {}) {
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  
   if (!res.ok) {
     const err = new Error(data?.message || res.statusText || 'Request failed');
     err.status = res.status;
@@ -45,7 +57,7 @@ export const api = {
   del: (p, opts) => request(p, { method: 'DELETE', ...opts }),
 };
 
-// Notification helpers (server must expose these endpoints)
+// Notification helpers
 export async function fetchNotifications() {
   return requestWithRetry('/notifications', {}, 2, 200);
 }

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/apiClient';
+import { parseTime, formatTime } from '../utils/helpers';
 import { useToast } from '../context/ToastContext';
-import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash } from 'lucide-react';
+import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash, Clock } from 'lucide-react';
 
 const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [title, setTitle] = useState('');
@@ -25,6 +26,8 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [mentionFilter, setMentionFilter] = useState('');
     const [originalEstimate, setOriginalEstimate] = useState('');
     const [timeSpent, setTimeSpent] = useState('');
+    const [estInput, setEstInput] = useState('');
+    const [spentInput, setSpentInput] = useState('');
 
 
     // For now simple single tag, later can be array
@@ -99,6 +102,8 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setStoryPoints(task.storyPoints || '');
             setOriginalEstimate(task.originalEstimate || '');
             setTimeSpent(task.timeSpent || '');
+            setEstInput(formatTime(task.originalEstimate || 0));
+            setSpentInput(formatTime(task.timeSpent || 0));
         } else {
             setTitle('');
             setDescription('');
@@ -113,6 +118,8 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setStoryPoints('');
             setOriginalEstimate('');
             setTimeSpent('');
+            setEstInput('');
+            setSpentInput('');
         }
     }, [task]);
 
@@ -536,40 +543,63 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     </div>
 
                                     <div className="pt-6">
-                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Time Tracking</label>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Time Tracking</label>
+                                            <Clock size={14} className="text-gray-400" />
+                                        </div>
                                         <div className="space-y-3">
                                             {originalEstimate > 0 && (
                                                 <div className="mb-2">
-                                                    <div className="flex justify-between text-xs mb-1 text-gray-500">
+                                                    <div className="flex justify-between text-xs mb-1 text-gray-500 font-medium">
                                                         <span>Progress</span>
                                                         <span>{Math.round((parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%</span>
                                                     </div>
-                                                    <div className="w-full bg-gray-200 rounded-full h-1.5 dark:bg-gray-700 overflow-hidden">
-                                                        <div className="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, (parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%` }}></div>
+                                                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700 overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all duration-500 ${parseInt(timeSpent) > parseInt(originalEstimate) ? 'bg-red-500' : 'bg-blue-500'}`}
+                                                            style={{ width: `${Math.min(100, (parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%` }}
+                                                        ></div>
                                                     </div>
                                                 </div>
                                             )}
-                                            <div className="flex gap-2">
-                                                <div className="flex-1">
-                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Est. (m)</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Estimated</label>
                                                     <input
-                                                        type="number"
-                                                        placeholder="Min"
-                                                        className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        value={originalEstimate}
-                                                        onChange={e => setOriginalEstimate(e.target.value)}
+                                                        type="text"
+                                                        placeholder="e.g. 2w 4d 6h"
+                                                        className="w-full text-sm p-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-gray-700 dark:text-gray-200"
+                                                        value={estInput}
+                                                        onChange={e => setEstInput(e.target.value)}
+                                                        onBlur={() => {
+                                                            const mins = parseTime(estInput);
+                                                            setOriginalEstimate(mins);
+                                                            setEstInput(formatTime(mins));
+                                                        }}
                                                     />
                                                 </div>
-                                                <div className="flex-1">
-                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Spent (m)</label>
+                                                <div>
+                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Time Spent</label>
                                                     <input
-                                                        type="number"
-                                                        placeholder="Min"
-                                                        className="w-full text-sm p-2 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20"
-                                                        value={timeSpent}
-                                                        onChange={e => setTimeSpent(e.target.value)}
+                                                        type="text"
+                                                        placeholder="e.g. 4h 30m"
+                                                        className="w-full text-sm p-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-gray-700 dark:text-gray-200"
+                                                        value={spentInput}
+                                                        onChange={e => setSpentInput(e.target.value)}
+                                                        onBlur={() => {
+                                                            const mins = parseTime(spentInput);
+                                                            setTimeSpent(mins);
+                                                            setSpentInput(formatTime(mins));
+                                                        }}
                                                     />
                                                 </div>
+                                            </div>
+                                            <div className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex justify-between items-center">
+                                                <span className="text-xs font-bold text-gray-500">Remaining</span>
+                                                <span className={`text-sm font-bold font-mono ${parseInt(originalEstimate || 0) - parseInt(timeSpent || 0) < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                    {formatTime(Math.max(0, parseInt(originalEstimate || 0) - parseInt(timeSpent || 0)))}
+                                                    {parseInt(originalEstimate || 0) - parseInt(timeSpent || 0) < 0 && <span className="text-xs ml-1 font-sans text-red-500">(Overdue)</span>}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
