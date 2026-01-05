@@ -12,13 +12,13 @@ function getToken() {
 async function request(path, options = {}) {
   // Construct the full URL
   // If path is "users/register", result is "https://.../api/users/register"
-  const url = path.startsWith('http') 
-    ? path 
-    : `${API_BASE}${path.startsWith('/api/') ? '' : ''}${path}`;
-    
+  const url = path.startsWith('http')
+    ? path
+    : `${API_BASE}${path.startsWith('/') ? '' : ''}${path}`;
+
   const headers = options.headers || {};
   const token = getToken();
-  
+
   if (token) headers.Authorization = `Bearer ${token}`;
   if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
@@ -28,7 +28,7 @@ async function request(path, options = {}) {
   const text = await res.text();
   let data;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-  
+
   if (!res.ok) {
     const err = new Error(data?.message || res.statusText || 'Request failed');
     err.status = res.status;
