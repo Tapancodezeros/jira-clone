@@ -1,5 +1,3 @@
-import axios from 'axios'; // Ensure axios is installed if you use it, or use fetch below
-
 // 1. Get the domain (Vercel Live URL or Localhost)
 const DOMAIN = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
