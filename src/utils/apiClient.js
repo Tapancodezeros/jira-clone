@@ -14,7 +14,7 @@ async function request(path, options = {}) {
   // If path is "users/register", result is "https://.../api/users/register"
   const url = path.startsWith('http') 
     ? path 
-    : `${API_BASE}${path.startsWith('/api/') ? '' : '/api/'}${path}`;
+    : `${API_BASE}${path.startsWith('/api/') ? '' : ''}${path}`;
     
   const headers = options.headers || {};
   const token = getToken();
