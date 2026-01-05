@@ -1,9 +1,10 @@
-// 1. Get the domain (Vercel Live URL or Localhost)
-const DOMAIN = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+// 1. Get the domain
+// Since your Vercel Env Variable already has '/api', we must include it in the local default too.
+const DOMAIN = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
-// 2. INTELLIGENT BASE URL:
-// Remove any trailing slash from DOMAIN, then append /api
-const API_BASE = `${DOMAIN.replace(/\/$/, '')}/api`;
+// 2. CLEAN BASE URL:
+// Just remove any trailing slash. DO NOT add "/api" manually anymore.
+const API_BASE = DOMAIN.replace(/\/$/, '');
 
 function getToken() {
   try { return localStorage.getItem('token'); } catch (e) { return null; }
@@ -11,10 +12,9 @@ function getToken() {
 
 async function request(path, options = {}) {
   // Construct the full URL
-  // If path is "users/register", result is "https://.../api/users/register"
   const url = path.startsWith('http')
     ? path
-    : `${API_BASE}${path.startsWith('/') ? '' : ''}${path}`;
+    : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`; // Fixed: Adds '/' if missing
 
   const headers = options.headers || {};
   const token = getToken();
