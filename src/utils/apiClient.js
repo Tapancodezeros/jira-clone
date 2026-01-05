@@ -1,9 +1,10 @@
-// 1. Get the domain (Localhost or Live)
-// If you are on Vercel, it uses VITE_API_URL. If local, it uses localhost:5000.
+import axios from 'axios'; // Ensure axios is installed if you use it, or use fetch below
+
+// 1. Get the domain (Vercel Live URL or Localhost)
 const DOMAIN = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-// 2. Remove trailing slash from DOMAIN if it exists, then append /api
-// This prevents errors like "http://site.com//api"
+// 2. INTELLIGENT BASE URL:
+// Remove any trailing slash from DOMAIN, then append /api
 const API_BASE = `${DOMAIN.replace(/\/$/, '')}/api`;
 
 function getToken() {
@@ -11,16 +12,19 @@ function getToken() {
 }
 
 async function request(path, options = {}) {
-  // If the path is a full URL (starts with http), use it as is. 
-  // Otherwise, attach it to API_BASE.
+  // Construct the full URL
+  // If path is "users/register", result is "https://.../api/users/register"
   const url = path.startsWith('http') 
     ? path 
     : `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
     
   const headers = options.headers || {};
   const token = getToken();
+  
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (options.body && !(options.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+  if (options.body && !(options.body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   const res = await fetch(url, { ...options, headers });
   const text = await res.text();
@@ -36,6 +40,7 @@ async function request(path, options = {}) {
   return data;
 }
 
+// Retry Logic
 export async function requestWithRetry(path, options = {}, retries = 3, backoffMs = 300) {
   let attempt = 0;
   while (true) {
@@ -50,6 +55,7 @@ export async function requestWithRetry(path, options = {}, retries = 3, backoffM
   }
 }
 
+// API Methods
 export const api = {
   get: (p, opts) => request(p, { method: 'GET', ...opts }),
   post: (p, body, opts) => request(p, { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body), ...opts }),
@@ -57,7 +63,7 @@ export const api = {
   del: (p, opts) => request(p, { method: 'DELETE', ...opts }),
 };
 
-// Notification helpers
+// Notification Helpers
 export async function fetchNotifications() {
   return requestWithRetry('/notifications', {}, 2, 200);
 }
