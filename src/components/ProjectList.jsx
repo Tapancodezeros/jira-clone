@@ -54,6 +54,17 @@ const ProjectList = () => {
 
     const filteredProjects = useMemo(() => {
         let res = projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
+
+        // Show all projects (admin/demo view)
+        // const user = JSON.parse(localStorage.getItem('user'));
+        // if (user && user.id) {
+        //     res = res.filter(p =>
+        //         String(p.ownerId) === String(user.id) ||
+        //         String(p.teamLeaderId) === String(user.id) ||
+        //         (p.members && Array.isArray(p.members) && p.members.some(m => String(m.id) === String(user.id)))
+        //     );
+        // }
+
         if (sortBy === 'name') {
             res.sort((a, b) => a.name.localeCompare(b.name));
         } else {

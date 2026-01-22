@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/apiClient';
 import { useParams } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 import confetti from 'canvas-confetti';
 import { Plus, Trash2, Edit2, Download, Calendar, Tag } from 'lucide-react';
 import TaskModal from './TaskModal';
@@ -12,7 +13,6 @@ import TrashModal from './TrashModal';
 const TaskBoard = () => {
     const { id } = useParams();
     const [tasks, setTasks] = useState([]);
-    // members will hold actual project members (from /projects/:id/members)
     const [members, setMembers] = useState([]);
     const [allUsers, setAllUsers] = useState([]);
     const [newMemberId, setNewMemberId] = useState('');
@@ -27,33 +27,63 @@ const TaskBoard = () => {
 
     const currentUser = JSON.parse(localStorage.getItem('user') || 'null');
 
-    const fetchTasks = useCallback(async () => {
-        const data = await api.get(`/tasks/${id}`);
-        if (data) setTasks(data);
-    }, [id]);
+    const [showMyTasks, setShowMyTasks] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
+    const [priorityFilter, setPriorityFilter] = useState('');
+    const [assigneeFilter, setAssigneeFilter] = useState('');
 
+    const fetchTasks = useCallback(async () => {
+        const queryParams = new URLSearchParams();
+        if (searchQuery) queryParams.append('search', searchQuery);
+        if (statusFilter) queryParams.append('status', statusFilter);
+        if (priorityFilter) queryParams.append('priority', priorityFilter);
+        if (assigneeFilter) queryParams.append('assigneeId', assigneeFilter);
+
+        const data = await api.get(`/tasks/${id}?${queryParams.toString()}`);
+        if (data) setTasks(data);
+    }, [id, searchQuery, statusFilter, priorityFilter, assigneeFilter]);
+
+    // Use a separate useEffect to debounce the search if needed or just fetch on filter change
     useEffect(() => {
-        // avoid synchronous setState inside effect by scheduling the fetch
-        const timer = setTimeout(() => { fetchTasks(); }, 0);
+        const timer = setTimeout(() => { fetchTasks(); }, 300); // 300ms debounce
         return () => clearTimeout(timer);
     }, [fetchTasks]);
 
-    // Fetch project meta and members to show team members
     useEffect(() => {
-        const fetchMeta = async () => {
+        const fetchProject = async () => {
             try {
-                const [projects, membersList, usersList] = await Promise.all([api.get('/projects'), api.get(`/projects/${id}/members`), api.get('/users')]);
-                if (projects) {
-                    const p = projects.find(pr => String(pr.id) === String(id));
-                    if (p) setProject(p);
-                }
-                if (membersList) setMembers(membersList);
-                if (usersList) setAllUsers(usersList);
+                // Optimized: Fetch single project data directly
+                const data = await api.get(`/projects/${id}`);
+                setProject(data);
             } catch (err) {
-                console.error('Meta fetch failed', err);
+                console.error('Failed to fetch project details', err);
             }
         };
-        fetchMeta();
+
+        const fetchMembers = async () => {
+            try {
+                // Fetch members in parallel
+                const data = await api.get(`/projects/${id}/members`);
+                setMembers(data || []);
+            } catch (err) {
+                console.error('Failed to fetch members', err);
+            }
+        };
+
+        const fetchUsers = async () => {
+            try {
+                // Fetch all users separately (non-blocking for project details)
+                const data = await api.get('/users');
+                setAllUsers(data || []);
+            } catch (err) {
+                console.error('Failed to fetch users', err);
+            }
+        };
+
+        fetchProject();
+        fetchMembers();
+        fetchUsers();
     }, [id]);
 
     const canManageMembers = () => {
@@ -63,6 +93,9 @@ const TaskBoard = () => {
 
     const addMember = async () => {
         if (!newMemberId) return showToast({ msg: 'Select a user to add' });
+        if (members.length >= 8) {
+            return showToast({ msg: 'Project cannot have more than 8 members.', type: 'error' });
+        }
         try {
             await api.post(`/projects/${id}/members`, { userId: newMemberId });
             // refresh members
@@ -86,8 +119,6 @@ const TaskBoard = () => {
             showToast({ msg: err?.data?.message || 'Failed to remove member' });
         }
     };
-
-    const [showMyTasks, setShowMyTasks] = useState(true);
 
     const handleDrop = async (e, status) => {
         const taskId = e.dataTransfer.getData("taskId");
@@ -132,6 +163,48 @@ const TaskBoard = () => {
         <>
             <Header />
             <div className="p-6 h-[calc(100vh-80px)] overflow-hidden">
+                {/* Filters Bar */}
+                <div className="mb-4 flex flex-wrap gap-4 items-center bg-white dark:bg-slate-900 p-3 rounded-xl border border-gray-100 dark:border-slate-800 shadow-sm animate-in fade-in slide-in-from-top-2">
+                    <div className="relative flex-1 min-w-[200px]">
+                        <input
+                            type="text"
+                            placeholder="Search tasks..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-3 pr-8 py-2 bg-gray-50 dark:bg-slate-800 border-none rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none"
+                        />
+                    </div>
+
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value)}
+                        className="p-2 text-sm bg-gray-50 dark:bg-slate-800 border-none rounded-lg focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
+                    >
+                        <option value="">All Statuses</option>
+                        {columns.map(col => <option key={col} value={col}>{col}</option>)}
+                    </select>
+
+                    <select
+                        value={priorityFilter}
+                        onChange={(e) => setPriorityFilter(e.target.value)}
+                        className="p-2 text-sm bg-gray-50 dark:bg-slate-800 border-none rounded-lg focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
+                    >
+                        <option value="">All Priorities</option>
+                        <option value="High">High</option>
+                        <option value="Medium">Medium</option>
+                        <option value="Low">Low</option>
+                    </select>
+
+                    <select
+                        value={assigneeFilter}
+                        onChange={(e) => setAssigneeFilter(e.target.value)}
+                        className="p-2 text-sm bg-gray-50 dark:bg-slate-800 border-none rounded-lg focus:ring-2 focus:ring-blue-500/20 outline-none cursor-pointer"
+                    >
+                        <option value="">All Assignees</option>
+                        {members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                    </select>
+                </div>
+
                 <div className="mb-6 flex items-center justify-between glass-panel p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-slate-800 animate-in fade-in slide-in-from-top-4">
                     <div className="flex items-center gap-4">
                         <button onClick={() => setIsModalOpen(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-xl hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30">
@@ -316,6 +389,7 @@ const TaskBoard = () => {
                     }, duration: DELETE_TIMEOUT
                 });
             }} />}
+            <Footer />
         </>
     );
 

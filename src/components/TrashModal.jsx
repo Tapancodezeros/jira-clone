@@ -11,18 +11,13 @@ export default function TrashModal({ projectId, onClose, onUpdate }) {
     const [isDeleting, setIsDeleting] = useState(false);
     const { showToast } = useToast();
 
-    // Fetch deleted tasks
     useEffect(() => {
         const fetchDeleted = async () => {
             try {
-                // Assuming endpoint to get deleted tasks for project
-                // If backend doesn't support filtering by status 'deleted', this might need adjustment
                 const data = await api.get(`/projects/${projectId}/trash`);
                 setDeletedTasks(Array.isArray(data) ? data : []);
             } catch (err) {
                 console.error("Failed to fetch trash", err);
-                // Fallback for demo/dev if API endpoint doesn't exist
-                // setDeletedTasks([]); 
                 showToast({ msg: 'Could not load trash', type: 'error' });
             } finally {
                 setLoading(false);
@@ -86,6 +81,21 @@ export default function TrashModal({ projectId, onClose, onUpdate }) {
         }
     };
 
+    const handleEmptyTrash = async () => {
+        if (!window.confirm('Are you sure you want to empty the trash? All items will be permanently deleted.')) return;
+        setIsDeleting(true);
+        try {
+            await api.del(`/projects/${projectId}/trash`);
+            showToast({ msg: 'Trash emptied successfully' });
+            setDeletedTasks([]);
+            setSelectedIds(new Set());
+        } catch (err) {
+            showToast({ msg: 'Failed to empty trash', type: 'error' });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
             <div className="glass-panel rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] overflow-hidden border border-gray-100 dark:border-slate-800">
@@ -136,6 +146,16 @@ export default function TrashModal({ projectId, onClose, onUpdate }) {
                                 Delete
                             </button>
                         </div>
+                    )}
+                    {filteredTasks.length > 0 && selectedIds.size === 0 && (
+                        <button
+                            onClick={handleEmptyTrash}
+                            disabled={isDeleting}
+                            className="ml-auto flex items-center gap-2 px-4 py-2.5 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 rounded-xl hover:bg-red-200 dark:hover:bg-red-900/60 text-sm font-bold transition-colors shadow-sm"
+                        >
+                            <Trash2 size={16} />
+                            Empty Trash
+                        </button>
                     )}
                 </div>
 

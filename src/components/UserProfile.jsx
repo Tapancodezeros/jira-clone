@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Header from './Header';
+import Footer from './Footer';
 import { User, Mail, Shield, Clock, Camera, Save, Key, LogOut } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 import api from '../utils/apiClient';
@@ -192,9 +193,13 @@ export default function UserProfile() {
                                                 <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Email Address</label>
                                                 <input
                                                     type="email"
-                                                    disabled
+                                                    disabled={!isEditing}   
                                                     value={formData.email}
-                                                    className="w-full p-3.5 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 text-slate-500 cursor-not-allowed"
+                                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                                    className={`w-full p-3.5 rounded-xl border outline-none transition-all ${isEditing
+                                                        ? 'bg-white dark:bg-slate-800 border-blue-500 ring-4 ring-blue-500/10'
+                                                        : 'bg-slate-50 dark:bg-slate-900/50 border-transparent text-slate-500'
+                                                        }`}
                                                 />
                                             </div>
                                             <div className="space-y-2 md:col-span-2">
@@ -202,6 +207,8 @@ export default function UserProfile() {
                                                 <textarea
                                                     rows="3"
                                                     disabled={!isEditing}
+                                                    value={formData.bio}
+                                                    onChange={e => setFormData({ ...formData, bio: e.target.value })}           
                                                     placeholder="Tell us a little about yourself..."
                                                     className={`w-full p-3.5 rounded-xl border outline-none resize-none transition-all ${isEditing
                                                         ? 'bg-white dark:bg-slate-800 border-blue-500 ring-4 ring-blue-500/10'
@@ -317,6 +324,7 @@ export default function UserProfile() {
                     </div>
                 </div>
             </div>
+            <Footer />
         </>
     );
 }

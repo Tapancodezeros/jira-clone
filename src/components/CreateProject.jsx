@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from './Header';
+import Footer from './Footer';
 import api from '../utils/apiClient';
+import TeamMembers from './TeamMembers';
+
 import { useToast } from '../context/ToastContext';
 
 const CreateProject = () => {
     const [name, setName] = useState('');
     const [description, setDescription] = useState('');
     const [teamLeaderId, setTeamLeaderId] = useState('');
+
     const [users, setUsers] = useState([]);
+    const [members, setMembers] = useState([]);
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const { showToast } = useToast();
@@ -44,7 +49,7 @@ const CreateProject = () => {
         if (!validateForm()) return;
         setLoading(true);
         try {
-            await api.post('/projects', { name, description, teamLeaderId, template });
+            await api.post('/projects', { name, description, teamLeaderId, template, members });
             showToast({ msg: 'Project created' });
             setTimeout(() => navigate('/dashboard'), 700);
         } catch (err) {
@@ -112,12 +117,18 @@ const CreateProject = () => {
                         </div>
                     </div>
 
+                    <div className="mb-8">
+                        <label className="block text-sm font-medium text-gray-700 mb-3">Team Members</label>
+                        <TeamMembers onChange={setMembers} />
+                    </div>
+
                     <button type="submit" disabled={loading} className={`px-4 py-2 text-white rounded ${loading ? 'bg-blue-300' : 'bg-blue-600'}`}>
                         {loading ? 'Creating...' : 'Create'}
                     </button>
                 </form>
             </div>
             {/* Toasts shown via global ToastProvider */}
+            <Footer />
         </>
     );
 };

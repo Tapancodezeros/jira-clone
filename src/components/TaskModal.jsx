@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/apiClient';
 import { parseTime, formatTime } from '../utils/helpers';
 import { useToast } from '../context/ToastContext';
-import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash, Clock } from 'lucide-react';
+import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash, Clock, Play, Pause } from 'lucide-react';
 
 const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [title, setTitle] = useState('');
@@ -28,12 +28,57 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [timeSpent, setTimeSpent] = useState('');
     const [estInput, setEstInput] = useState('');
     const [spentInput, setSpentInput] = useState('');
+    const [isTracking, setIsTracking] = useState(task && task.status !== 'Done');
+    const wasTrackingRef = React.useRef(false);
 
 
     // For now simple single tag, later can be array
     const [activeTab, setActiveTab] = useState('details');
 
     const { showToast } = useToast();
+
+    // Timer Logic
+    useEffect(() => {
+        let interval;
+        if (isTracking) {
+            interval = setInterval(() => {
+                setTimeSpent(prev => {
+                    const newVal = parseInt(prev || 0) + 1;
+                    setSpentInput(formatTime(newVal));
+                    return newVal;
+                });
+            }, 60000); // Update every minute
+        }
+        return () => clearInterval(interval);
+    }, [isTracking]);
+
+    // Auto Start/Stop on System Lock/Visibility Change
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                if (isTracking) {
+                    wasTrackingRef.current = true;
+                    setIsTracking(false);
+                    // showToast({ msg: 'Timer paused (away)' });
+                }
+            } else {
+                if (wasTrackingRef.current) {
+                    setIsTracking(true);
+                    wasTrackingRef.current = false;
+                    showToast({ msg: 'Timer resumed' });
+                }
+            }
+        };
+
+        // Initial check
+        if (document.hidden && isTracking) {
+            wasTrackingRef.current = true;
+            setIsTracking(false);
+        }
+
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+    }, [isTracking]);
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -93,11 +138,9 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setDescription(task.description || '');
             setAssigneeId(task.assigneeId || '');
             setStatus(task.status || 'Todo');
-            setStatus(task.status || 'Todo');
             setPriority(task.priority || 'Medium');
             setDueDate(task.dueDate || '');
             setLabels(Array.isArray(task.labels) ? task.labels.join(', ') : '');
-            setIssueType(task.issueType || 'Task');
             setIssueType(task.issueType || 'Task');
             setStoryPoints(task.storyPoints || '');
             setOriginalEstimate(task.originalEstimate || '');
@@ -109,12 +152,10 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setDescription('');
             setAssigneeId('');
             setStatus('Todo');
-            setStatus('Todo');
             setPriority('Medium');
             setDueDate('');
             setLabels('');
-            setIssueType('Task');
-            setIssueType('Task');
+            setIssueType('Task')
             setStoryPoints('');
             setOriginalEstimate('');
             setTimeSpent('');
@@ -545,7 +586,19 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     <div className="pt-6">
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Time Tracking</label>
-                                            <Clock size={14} className="text-gray-400" />
+                                            <button
+                                                onClick={() => setIsTracking(!isTracking)}
+                                                className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${isTracking
+                                                    ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 animate-pulse'
+                                                    : 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-100'
+                                                    }`}
+                                            >
+                                                {isTracking ? (
+                                                    <> <Pause size={12} fill="currentColor" /> Tracking ({spentInput || '0m'}) </>
+                                                ) : (
+                                                    <> <Play size={12} fill="currentColor" /> Start Timer </>
+                                                )}
+                                            </button>
                                         </div>
                                         <div className="space-y-3">
                                             {originalEstimate > 0 && (
