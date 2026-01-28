@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/apiClient';
 import { parseTime, formatTime } from '../utils/helpers';
 import { useToast } from '../context/ToastContext';
-import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash, Clock, Play, Pause } from 'lucide-react';
+import { X, Save, Trash2, User, Flag, CheckCircle, AlignLeft, Calendar, CheckSquare, Bug, BookOpen, Zap, Hash, Clock, Play, Pause, Link, Paperclip, Eye, EyeOff, FileText, Download } from 'lucide-react';
 
 const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [title, setTitle] = useState('');
@@ -28,12 +28,23 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [timeSpent, setTimeSpent] = useState('');
     const [estInput, setEstInput] = useState('');
     const [spentInput, setSpentInput] = useState('');
+    const [activeTab, setActiveTab] = useState('details');
+    const [links, setLinks] = useState([]);
+    const [attachments, setAttachments] = useState([]);
+    const [isWatching, setIsWatching] = useState(false);
+    const [linkType, setLinkType] = useState('Relates to');
+    const [linkSearch, setLinkSearch] = useState('');
+    const [searchedTasks, setSearchedTasks] = useState([]);
+    const [isSearchingLinks, setIsSearchingLinks] = useState(false);
+
+    // Timer Logic
     const [isTracking, setIsTracking] = useState(task && task.status !== 'Done');
     const wasTrackingRef = React.useRef(false);
+    const lastTickRef = React.useRef(0);
 
-
-    // For now simple single tag, later can be array
-    const [activeTab, setActiveTab] = useState('details');
+    // Releases state for Fix Version
+    const [releases, setReleases] = useState([]);
+    const [fixVersion, setFixVersion] = useState('');
 
     const { showToast } = useToast();
 
@@ -41,15 +52,33 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     useEffect(() => {
         let interval;
         if (isTracking) {
+            lastTickRef.current = Date.now();
             interval = setInterval(() => {
                 setTimeSpent(prev => {
                     const newVal = parseInt(prev || 0) + 1;
                     setSpentInput(formatTime(newVal));
                     return newVal;
                 });
+                lastTickRef.current = Date.now();
             }, 60000); // Update every minute
         }
-        return () => clearInterval(interval);
+
+        return () => {
+            clearInterval(interval);
+            // On stop, if partial minute > 1s, round up means add 1 minute
+            if (isTracking && lastTickRef.current) {
+                const elapsed = Date.now() - lastTickRef.current;
+                if (elapsed > 1000) { // threshold to ignore immediate toggles
+                    setTimeSpent(prev => {
+                        const newVal = parseInt(prev || 0) + 1;
+                        setSpentInput(formatTime(newVal));
+                        // Update ref to avoid double counting if this cleanup runs multiple times (though unlikely with [] dep not changing)
+                        lastTickRef.current = Date.now();
+                        return newVal;
+                    });
+                }
+            }
+        };
     }, [isTracking]);
 
     // Auto Start/Stop on System Lock/Visibility Change
@@ -86,7 +115,15 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             if (data) setUsers(data);
         };
         fetchUsers();
-    }, []);
+
+        // Load releases from local storage
+        if (projectId) {
+            try {
+                const stored = localStorage.getItem(`releases_${projectId}`);
+                if (stored) setReleases(JSON.parse(stored));
+            } catch (e) { console.error(e); }
+        }
+    }, [projectId]);
 
     const fetchComments = async (tid) => {
         if (!tid) return;
@@ -102,8 +139,40 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
 
     const fetchSubtasks = async (tid) => {
         if (!tid) return;
-        const data = await api.get(`/tasks/${tid}/subtasks`);
-        if (data) setSubtasks(data);
+        try {
+            const data = await api.get(`/tasks/${tid}/subtasks`);
+            if (data) setSubtasks(data);
+        } catch (e) { console.error('Subtasks fetch failed', e); }
+    };
+
+    const fetchLinks = async (tid) => {
+        if (!tid) return;
+        try {
+            const data = await api.get(`/tasks/${tid}/links`);
+            if (data) setLinks(data);
+        } catch (e) {
+            // console.warn('Links fetch failed (backend might not support it yet)', e);
+            setLinks([]);
+        }
+    };
+
+    const fetchAttachments = async (tid) => {
+        if (!tid) return;
+        try {
+            const data = await api.get(`/tasks/${tid}/attachments`);
+            if (data) setAttachments(data);
+        } catch (e) {
+            // console.warn('Attachments fetch failed (backend might not support it yet)', e);
+            setAttachments([]);
+        }
+    };
+
+    const fetchWatchStatus = async (tid) => {
+        if (!tid) return;
+        try {
+            const data = await api.get(`/tasks/${tid}/watch`);
+            setIsWatching(data?.watching || false);
+        } catch (e) { setIsWatching(false); }
     };
 
     const handleAddSubtask = async () => {
@@ -126,9 +195,44 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
 
     useEffect(() => {
         if (task && task.id) {
+            // Fetch fresh task details
+            const fetchTaskDetails = async () => {
+                try {
+                    const detailedTask = await api.get(`/tasks/${task.id}`);
+                    if (detailedTask) {
+                        // Update local state with fresh data
+                        setTitle(detailedTask.title || '');
+                        setDescription(detailedTask.description || '');
+                        setAssigneeId(detailedTask.assigneeId || '');
+                        setStatus(detailedTask.status || 'Todo');
+                        setPriority(detailedTask.priority || 'Medium');
+                        setDueDate(detailedTask.dueDate || '');
+                        setLabels(Array.isArray(detailedTask.labels) ? detailedTask.labels.filter(l => !l.startsWith('v:')).join(', ') : '');
+                        setIssueType(detailedTask.issueType || 'Task');
+                        setStoryPoints(detailedTask.storyPoints || '');
+                        setOriginalEstimate(detailedTask.originalEstimate || '');
+                        setTimeSpent(detailedTask.timeSpent || '');
+                        setEstInput(formatTime(detailedTask.originalEstimate || 0));
+                        setSpentInput(formatTime(detailedTask.timeSpent || 0));
+
+                        // Update releases/fixVersion if stored in labels
+                        if (Array.isArray(detailedTask.labels)) {
+                            const verLabel = detailedTask.labels.find(l => l.startsWith('v:'));
+                            if (verLabel) setFixVersion(verLabel.replace('v:', ''));
+                            else setFixVersion('');
+                        }
+                    }
+                } catch (e) { console.error('Failed to fetch detailed task', e); }
+            };
+            fetchTaskDetails();
+
             if (activeTab === 'comments') fetchComments(task.id);
             if (activeTab === 'history') fetchActivities(task.id);
             if (activeTab === 'subtasks') fetchSubtasks(task.id);
+            if (activeTab === 'links') fetchLinks(task.id);
+            if (activeTab === 'attachments') fetchAttachments(task.id);
+            // Always fetch watch status
+            fetchWatchStatus(task.id);
         }
     }, [activeTab, task]);
 
@@ -140,13 +244,27 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             setStatus(task.status || 'Todo');
             setPriority(task.priority || 'Medium');
             setDueDate(task.dueDate || '');
-            setLabels(Array.isArray(task.labels) ? task.labels.join(', ') : '');
+            setLabels(Array.isArray(task.labels) ? task.labels.filter(l => !l.startsWith('v:')).join(', ') : '');
+
+            // Extract Fix Version from labels (convention: v:VersionName)
+            if (Array.isArray(task.labels)) {
+                const verLabel = task.labels.find(l => l.startsWith('v:'));
+                if (verLabel) setFixVersion(verLabel.replace('v:', ''));
+                else setFixVersion('');
+            } else {
+                setFixVersion('');
+            }
+
             setIssueType(task.issueType || 'Task');
             setStoryPoints(task.storyPoints || '');
             setOriginalEstimate(task.originalEstimate || '');
             setTimeSpent(task.timeSpent || '');
             setEstInput(formatTime(task.originalEstimate || 0));
             setSpentInput(formatTime(task.timeSpent || 0));
+            // Reset complex states
+            setLinks([]);
+            setAttachments([]);
+            setIsWatching(false);
         } else {
             setTitle('');
             setDescription('');
@@ -169,13 +287,19 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
         setIsLoading(true);
         try {
             const labelArray = labels.split(',').map(l => l.trim()).filter(l => l);
+            // Append Fix Version as a label
+            if (fixVersion) {
+                // remove old version tags first if any to avoid duplicates logic if user manually typed it? Not really needed if we filter above.
+                // better: strict enforcement
+                labelArray.push(`v:${fixVersion}`);
+            }
             const payload = {
                 title, description, projectId, assigneeId, status, priority,
                 dueDate: dueDate || null,
                 labels: labelArray,
                 issueType,
                 storyPoints: storyPoints ? parseInt(storyPoints) : null,
-                originalEstimate: originalEstimate ? parseInt(originalEstimate) : 0,
+                originalEstimate: originalEstimate ? parseInt(originalEstimate) : null,
                 timeSpent: timeSpent ? parseInt(timeSpent) : 0
             };
             if (task && task.id) {
@@ -202,17 +326,82 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
         }
     };
 
+    const handleAddLink = async (targetTaskId) => {
+        if (!targetTaskId || !task) return;
+        try {
+            await api.post(`/tasks/${task.id}/links`, { targetTaskId, type: linkType });
+            setLinkSearch('');
+            setSearchedTasks([]);
+            fetchLinks(task.id);
+            showToast({ msg: 'Issue linked' });
+        } catch (e) {
+            showToast({ msg: 'Failed to link issue (Backend?)' });
+        }
+    };
+
+    const handleRemoveLink = async (linkId) => {
+        try {
+            await api.del(`/tasks/${task.id}/links/${linkId}`);
+            fetchLinks(task.id);
+        } catch (e) { console.error(e); }
+    };
+
+    const handleSearchTasks = async (q) => {
+        setLinkSearch(q);
+        if (!q.trim()) {
+            setSearchedTasks([]);
+            return;
+        }
+        setIsSearchingLinks(true);
+        try {
+            const data = await api.get(`/tasks/project/${projectId}?search=${q}`);
+            setSearchedTasks(data.filter(t => t.id !== task.id) || []);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsSearchingLinks(false);
+        }
+    };
+
+    const handleToggleWatch = async () => {
+        try {
+            const newStatus = !isWatching;
+            await api.post(`/tasks/${task.id}/watch`, { watching: newStatus });
+            setIsWatching(newStatus);
+            showToast({ msg: newStatus ? 'Watching this issue' : 'Stopped watching' });
+        } catch (e) {
+            // Optimistic toggle fallback if backend not ready
+            setIsWatching(!isWatching);
+        }
+    };
+
+    const handleFileUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file || !task) return;
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            await api.post(`/tasks/${task.id}/attachments`, formData);
+            fetchAttachments(task.id);
+            showToast({ msg: 'File uploaded' });
+        } catch (err) {
+            showToast({ msg: 'Upload failed (Backend might need update)' });
+        }
+    };
+
     return (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex justify-center items-center p-4 animate-in fade-in duration-300">
-            <div className="glass-panel w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden rounded-2xl shadow-2xl border border-gray-100/50 dark:border-slate-700/50 relative">
+            <div className="glass-panel w-full max-w-5xl h-[90vh] flex flex-col overflow-hidden rounded-2xl shadow-2xl border border-slate-100/50 dark:border-slate-700/50 relative">
                 {/* Header */}
-                <div className="flex items-center justify-between p-5 border-b border-gray-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
+                <div className="flex items-center justify-between p-5 border-b border-slate-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center bg-white dark:bg-slate-700 rounded-md border border-gray-200 dark:border-slate-600 p-1">
+                        <div className="flex items-center bg-white dark:bg-slate-700 rounded-md border border-slate-200 dark:border-slate-600 p-1">
                             <select
                                 value={issueType}
                                 onChange={e => setIssueType(e.target.value)}
-                                className="bg-transparent text-xs font-bold uppercase text-gray-700 dark:text-gray-200 outline-none cursor-pointer"
+                                className="bg-transparent text-xs font-bold uppercase text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
                             >
                                 <option value="Task">Task</option>
                                 <option value="Bug">Bug</option>
@@ -229,15 +418,24 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-lg font-mono text-xs font-bold tracking-tight">
                             {task ? `TASK-${task.id}` : 'NEW TASK'}
                         </span>
-                        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{projectId ? `Project #${projectId}` : 'Jira Clone'}</span>
+                        <span className="text-sm font-medium text-slate-500 dark:text-slate-400">{projectId ? `Project #${projectId}` : 'Jira Clone'}</span>
                     </div>
                     <div className="flex gap-2">
                         {task && (
-                            <button onClick={handleDelete} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors" title="Delete">
-                                <Trash2 size={20} />
-                            </button>
+                            <>
+                                <button
+                                    onClick={handleToggleWatch}
+                                    className={`p-2 rounded-lg transition-colors ${isWatching ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400'}`}
+                                    title={isWatching ? "Stop Watching" : "Watch Issue"}
+                                >
+                                    {isWatching ? <Eye size={20} /> : <EyeOff size={20} />}
+                                </button>
+                                <button onClick={handleDelete} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors" title="Delete">
+                                    <Trash2 size={20} />
+                                </button>
+                            </>
                         )}
-                        <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 rounded-lg transition-colors" title="Close">
+                        <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 rounded-lg transition-colors" title="Close">
                             <X size={22} />
                         </button>
                     </div>
@@ -248,32 +446,37 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                     <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                         <input
                             type="text"
-                            className="text-3xl font-bold text-gray-900 dark:text-white w-full bg-transparent outline-none placeholder-gray-400 dark:placeholder-gray-600 mb-8 leading-tight"
+                            className="text-3xl font-bold text-slate-900 dark:text-white w-full bg-transparent outline-none placeholder-slate-400 dark:placeholder-slate-600 mb-8 leading-tight"
                             placeholder="Task Summary"
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                         />
 
                         {/* Tabs */}
-                        <div className="flex items-center gap-8 border-b border-gray-200/60 dark:border-slate-700/60 mb-8">
-                            {['details', 'subtasks', 'comments', 'history'].map(tab => (
+                        <div className="flex items-center gap-6 border-b border-slate-200/60 dark:border-slate-700/60 mb-8 overflow-x-auto">
+                            {['details', 'subtasks', 'links', 'files', 'comments', 'history'].map(tab => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    className={`pb-3 text-sm font-bold border-b-2 transition-all capitalize ${activeTab === tab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200'}`}
+                                    className={`pb-3 text-sm font-bold border-b-2 transition-all capitalize ${activeTab === tab ? 'border-blue-600 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}
                                 >
-                                    {tab}
+                                    {tab === 'details' && 'Description'}
+                                    {tab === 'subtasks' && `Subtasks ${subtasks.length ? `(${subtasks.length})` : ''}`}
+                                    {tab === 'links' && `Links ${links.length ? `(${links.length})` : ''}`}
+                                    {tab === 'files' && `Files ${attachments.length ? `(${attachments.length})` : ''}`}
+                                    {tab === 'comments' && `Comments ${comments.length ? `(${comments.length})` : ''}`}
+                                    {tab === 'history' && 'History'}
                                 </button>
                             ))}
                         </div>
 
                         {activeTab === 'details' && (
                             <div className="mb-6 animate-in fade-in duration-300">
-                                <label className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wider">
+                                <label className="flex items-center gap-2 text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 uppercase tracking-wider">
                                     <AlignLeft size={16} /> Description
                                 </label>
                                 <textarea
-                                    className="w-full min-h-[250px] p-4 bg-gray-50/50 dark:bg-slate-900/50 border border-gray-200 dark:border-slate-700/50 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-slate-900 outline-none resize-none text-sm leading-relaxed text-gray-800 dark:text-gray-200 transition-all"
+                                    className="w-full min-h-[250px] p-4 bg-slate-50/50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/50 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:bg-white dark:focus:bg-slate-900 outline-none resize-none text-sm leading-relaxed text-slate-800 dark:text-slate-200 transition-all"
                                     placeholder="Add a more detailed description..."
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
@@ -283,7 +486,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         {activeTab === 'subtasks' && (
                             <div className="animate-in fade-in duration-300">
                                 <div className="space-y-3 mb-6">
-                                    {subtasks.length === 0 && <div className="text-gray-400 text-sm text-center py-8 bg-gray-50/30 dark:bg-slate-800/30 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">No subtasks yet. Break it down!</div>}
+                                    {subtasks.length === 0 && <div className="text-slate-400 text-sm text-center py-8 bg-slate-50/30 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">No subtasks yet. Break it down!</div>}
                                     {subtasks.map(st => (
                                         <div
                                             key={st.id}
@@ -297,15 +500,15 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                     showToast({ msg: 'Failed to update subtask' });
                                                 }
                                             }}
-                                            className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800/80 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
+                                            className="flex items-center gap-4 p-4 bg-white dark:bg-slate-800/80 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group"
                                         >
-                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all ${st.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-gray-300 dark:border-slate-600 bg-gray-50 dark:bg-slate-700'}`}>
+                                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center border transition-all ${st.status === 'Done' ? 'bg-green-500 border-green-500' : 'border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700'}`}>
                                                 {st.status === 'Done' && <CheckSquare size={14} className="text-white" />}
                                             </div>
-                                            <span className={`text-sm flex-1 font-medium transition-colors ${st.status === 'Done' ? 'text-gray-400 line-through dark:text-gray-500' : 'text-gray-700 dark:text-gray-200'}`}>{st.title}</span>
+                                            <span className={`text-sm flex-1 font-medium transition-colors ${st.status === 'Done' ? 'text-slate-400 line-through dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}`}>{st.title}</span>
 
                                             <div className="flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
-                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${st.priority === 'High' || st.priority === 'Critical' ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-gray-100 text-gray-500 dark:bg-slate-700 dark:text-gray-400'}`}>{st.priority}</span>
+                                                <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded ${st.priority === 'High' || st.priority === 'Critical' ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>{st.priority}</span>
                                             </div>
                                         </div>
                                     ))}
@@ -313,7 +516,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                 <div className="flex gap-3">
                                     <input
                                         type="text"
-                                        className="flex-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none shadow-sm transition-all text-gray-800 dark:text-gray-200"
+                                        className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3.5 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none shadow-sm transition-all text-slate-800 dark:text-slate-200"
                                         placeholder="What needs to be done?"
                                         value={newSubtaskTitle}
                                         onChange={e => setNewSubtaskTitle(e.target.value)}
@@ -328,9 +531,101 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                 </div>
                             </div>
                         )}
+                        {activeTab === 'links' && (
+                            <div className="animate-in fade-in duration-300">
+                                <div className="space-y-4 mb-8">
+                                    {links.length === 0 && <div className="text-slate-400 text-sm text-center py-8 bg-slate-50/30 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">No linked issues.</div>}
+                                    {links.map(link => (
+                                        <div key={link.id} className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl shadow-sm hover:shadow-md transition-all">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-xs font-bold uppercase text-slate-500 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">{link.type}</span>
+                                                <Link size={14} className="text-slate-400" />
+                                                <span className={`text-sm font-medium ${link.targetTask?.status === 'Done' ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                                                    {link.targetTask?.title || `Task #${link.targetTaskId}`}
+                                                </span>
+                                            </div>
+                                            <button onClick={() => handleRemoveLink(link.id)} className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
+                                                <X size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Link Issue</h4>
+                                    <div className="flex gap-2 mb-3">
+                                        <select
+                                            value={linkType}
+                                            onChange={e => setLinkType(e.target.value)}
+                                            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-3 py-2 outline-none"
+                                        >
+                                            <option>Relates to</option>
+                                            <option>Blocks</option>
+                                            <option>Is blocked by</option>
+                                            <option>Clones</option>
+                                        </select>
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="text"
+                                                placeholder="Search issues..."
+                                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500/20"
+                                                value={linkSearch}
+                                                onChange={e => handleSearchTasks(e.target.value)}
+                                            />
+                                            {searchedTasks.length > 0 && (
+                                                <div className="absolute top-full left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-20">
+                                                    {searchedTasks.map(t => (
+                                                        <button
+                                                            key={t.id}
+                                                            onClick={() => handleAddLink(t.id)}
+                                                            className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 dark:hover:bg-slate-700 flex justify-between group"
+                                                        >
+                                                            <span className="truncate flex-1">{t.title}</span>
+                                                            <span className="text-slate-400 text-xs">#{t.id}</span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {activeTab === 'files' && (
+                            <div className="animate-in fade-in duration-300">
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
+                                    {attachments.length === 0 && <div className="col-span-full text-slate-400 text-sm text-center py-10 bg-slate-50/30 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">No files attached yet.</div>}
+                                    {attachments.map(file => (
+                                        <div key={file.id} className="group relative bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-4 hover:shadow-md transition-all">
+                                            <div className="flex items-center gap-3 mb-2">
+                                                <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-slate-700 flex items-center justify-center text-blue-500">
+                                                    <FileText size={20} />
+                                                </div>
+                                                <div className="overflow-hidden">
+                                                    <div className="text-sm font-bold truncate text-slate-800 dark:text-slate-200" title={file.name}>{file.name}</div>
+                                                    <div className="text-xs text-slate-400">{file.size || '0 KB'}</div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-slate-700 rounded transition-colors" download>
+                                                    <Download size={14} />
+                                                </a>
+                                                <button className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors">
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <label className="flex items-center justify-center w-full p-4 border-2 border-dashed border-blue-200 dark:border-blue-900/30 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 text-blue-600 dark:text-blue-400 font-bold text-sm cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/20 transition-all gap-2">
+                                    <Paperclip size={18} />
+                                    <span>Click to upload attachment</span>
+                                    <input type="file" className="hidden" onChange={handleFileUpload} />
+                                </label>
+                            </div>
+                        )}
                         {activeTab === 'comments' && (
                             <div className="animate-in fade-in duration-300">
-                                <div className={`bg-white dark:bg-slate-900 border transition-all duration-200 ${isCommentFocused ? 'border-blue-500 ring-4 ring-blue-500/10 rounded-xl shadow-lg p-4' : 'border-gray-200 dark:border-slate-700 rounded-[20px] p-0 hover:border-gray-300 dark:hover:border-slate-600'}`}>
+                                <div className={`bg-white dark:bg-slate-900 border transition-all duration-200 ${isCommentFocused ? 'border-blue-500 ring-4 ring-blue-500/10 rounded-xl shadow-lg p-4' : 'border-slate-200 dark:border-slate-700 rounded-[20px] p-0 hover:border-slate-300 dark:hover:border-slate-600'}`}>
                                     <div className={`flex gap-4 ${isCommentFocused ? '' : 'p-2 mb-0'}`}>
                                         {!isCommentFocused && (
                                             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs shrink-0 ml-1 mt-1">
@@ -339,20 +634,20 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                         )}
                                         <div className="flex-1">
                                             {isCommentFocused && (
-                                                <div className="flex items-center gap-1 mb-2 pb-2 border-b border-gray-100 dark:border-slate-800 text-gray-400">
-                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors" title="Bold"><strong>B</strong></button>
-                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors italic" title="Italic"><em>I</em></button>
-                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors underline decoration-solid" title="Underline">U</button>
-                                                    <div className="w-px h-4 bg-gray-200 dark:bg-slate-700 mx-1"></div>
-                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors" title="List"><AlignLeft size={14} /></button>
-                                                    <button className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-gray-500 dark:text-gray-400 transition-colors" title="Code">{'< >'}</button>
+                                                <div className="flex items-center gap-1 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800 text-slate-400">
+                                                    <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 transition-colors" title="Bold"><strong>B</strong></button>
+                                                    <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 transition-colors italic" title="Italic"><em>I</em></button>
+                                                    <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 transition-colors underline decoration-solid" title="Underline">U</button>
+                                                    <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+                                                    <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 transition-colors" title="List"><AlignLeft size={14} /></button>
+                                                    <button className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded text-slate-500 dark:text-slate-400 transition-colors" title="Code">{'< >'}</button>
                                                 </div>
                                             )}
                                             <div className="relative">
                                                 <textarea
                                                     placeholder={isCommentFocused ? "Add a comment..." : "Add a comment..."}
                                                     onFocus={() => setIsCommentFocused(true)}
-                                                    className={`w-full bg-transparent outline-none text-sm text-gray-800 dark:text-gray-200 placeholder-gray-500 resize-none transition-all ${isCommentFocused ? 'min-h-[120px]' : 'min-h-[40px] pt-2.5 ml-1'}`}
+                                                    className={`w-full bg-transparent outline-none text-sm text-slate-800 dark:text-slate-200 placeholder-slate-500 resize-none transition-all ${isCommentFocused ? 'min-h-[120px]' : 'min-h-[40px] pt-2.5 ml-1'}`}
                                                     value={newComment}
                                                     onChange={e => {
                                                         const val = e.target.value;
@@ -375,8 +670,8 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                 ></textarea>
 
                                                 {showMentionList && (
-                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                                                        <div className="px-3 py-2 bg-gray-50 dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 text-xs font-bold text-gray-500 uppercase">
+                                                    <div className="absolute left-0 bottom-full mb-2 w-64 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                                        <div className="px-3 py-2 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-500 uppercase">
                                                             Mention User
                                                         </div>
                                                         <div className="max-h-48 overflow-y-auto">
@@ -401,11 +696,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                                     <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xs font-bold">
                                                                         {u.name.charAt(0)}
                                                                     </div>
-                                                                    <span className="text-sm text-gray-700 dark:text-gray-200">{u.name}</span>
+                                                                    <span className="text-sm text-slate-700 dark:text-slate-200">{u.name}</span>
                                                                 </button>
                                                             ))}
                                                             {users.filter(u => u.name.toLowerCase().includes(mentionFilter)).length === 0 && (
-                                                                <div className="p-3 text-center text-gray-400 text-sm italic">No users found</div>
+                                                                <div className="p-3 text-center text-slate-400 text-sm italic">No users found</div>
                                                             )}
                                                         </div>
                                                     </div>
@@ -414,11 +709,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
 
                                             {isCommentFocused && (
                                                 <div className="flex items-center justify-between mt-3 animate-in fade-in slide-in-from-top-1 duration-200">
-                                                    <span className="text-xs text-gray-400 font-medium"><strong>Pro tip:</strong> press <kbd className="bg-gray-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-gray-200 dark:border-slate-700 font-sans">M</kbd> to comment</span>
+                                                    <span className="text-xs text-slate-400 font-medium"><strong>Pro tip:</strong> press <kbd className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 font-sans">M</kbd> to comment</span>
                                                     <div className="flex items-center gap-2">
                                                         <button
                                                             onClick={() => setIsCommentFocused(false)}
-                                                            className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                                            className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                                                         >
                                                             Cancel
                                                         </button>
@@ -443,7 +738,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     </div>
                                 </div>
                                 <div className="space-y-6">
-                                    {comments.length === 0 && <p className="text-gray-400 text-sm text-center italic">No comments yet.</p>}
+                                    {comments.length === 0 && <p className="text-slate-400 text-sm text-center italic">No comments yet.</p>}
                                     {comments.map(c => (
                                         <div key={c.id} className="flex gap-4 group animate-in fade-in slide-in-from-bottom-2">
                                             <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0 shadow-sm border border-indigo-200 dark:border-indigo-800">
@@ -451,10 +746,10 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                             </div>
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1.5">
-                                                    <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{c.author?.name || 'Unknown'}</span>
-                                                    <span className="text-xs text-gray-400">{new Date(c.createdAt).toLocaleString()}</span>
+                                                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{c.author?.name || 'Unknown'}</span>
+                                                    <span className="text-xs text-slate-400">{new Date(c.createdAt).toLocaleString()}</span>
                                                 </div>
-                                                <div className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-800/50 p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl border border-gray-100 dark:border-slate-700/50 shadow-sm inline-block max-w-[90%]">
+                                                <div className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap bg-white dark:bg-slate-800/50 p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl border border-slate-100 dark:border-slate-700/50 shadow-sm inline-block max-w-[90%]">
                                                     {c.content.split(/(@\[[^\]]+\])/g).map((part, i) => {
                                                         const match = part.match(/@\[([^\]]+)\]/);
                                                         if (match) {
@@ -471,15 +766,15 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         )}
                         {activeTab === 'history' && (
                             <div className="animate-in fade-in duration-300 space-y-4">
-                                {activities.length === 0 && <p className="text-gray-400 text-sm text-center italic">No history yet.</p>}
+                                {activities.length === 0 && <p className="text-slate-400 text-sm text-center italic">No history yet.</p>}
                                 {activities.map((a, i) => (
                                     <div key={a.id} className="flex gap-4 items-start pl-2 relative" style={{ animationDelay: `${i * 0.05}s` }}>
-                                        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gray-100 dark:bg-slate-800 ml-[5px]"></div>
+                                        <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-slate-100 dark:bg-slate-800 ml-[5px]"></div>
                                         <div className="w-3 h-3 rounded-full bg-blue-400 ring-4 ring-white dark:ring-slate-900 z-10 mt-1.5"></div>
-                                        <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50/50 dark:bg-slate-800/30 p-2 rounded-lg flex-1">
-                                            <span className="font-bold text-gray-900 dark:text-gray-200">{a.actor?.name || 'Someone'}</span>
+                                        <div className="text-sm text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 p-2 rounded-lg flex-1">
+                                            <span className="font-bold text-slate-900 dark:text-slate-200">{a.actor?.name || 'Someone'}</span>
                                             <span className="mx-1">{a.description}</span>
-                                            <div className="text-xs text-gray-400 mt-1 font-medium">{new Date(a.createdAt).toLocaleString()}</div>
+                                            <div className="text-xs text-slate-400 mt-1 font-medium">{new Date(a.createdAt).toLocaleString()}</div>
                                         </div>
                                     </div>
                                 ))}
@@ -488,30 +783,31 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                     </div>
 
                     {/* Sidebar */}
-                    <div className="w-full md:w-80 bg-gray-50/80 dark:bg-slate-900/80 backdrop-blur-md border-l border-gray-200 dark:border-slate-700 p-6 overflow-y-auto section-glass">
+                    <div className="w-full md:w-80 bg-slate-50/80 dark:bg-slate-900/80 backdrop-blur-md border-l border-slate-200 dark:border-slate-700 p-6 overflow-y-auto section-glass">
                         <div className="space-y-8">
                             <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 block">Status</label>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 block">Status</label>
                                 <div className="relative">
                                     <select
-                                        className="w-full p-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm font-semibold appearance-none text-gray-700 dark:text-gray-200 hover:border-blue-400 transition-colors"
+                                        className="w-full p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500/20 shadow-sm font-semibold appearance-none text-slate-700 dark:text-slate-200 hover:border-blue-400 transition-colors"
                                         value={status}
                                         onChange={(e) => setStatus(e.target.value)}
                                     >
+                                        <option value="Backlog">Backlog</option>
                                         <option value="Todo">Todo</option>
                                         <option value="In Progress">In Progress</option>
                                         <option value="Done">Done</option>
                                     </select>
-                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
                                 </div>
                             </div>
 
                             <div>
-                                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 block">Attributes</label>
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 block">Attributes</label>
                                 <div className="space-y-5">
                                     <div className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            <Flag size={16} className="text-gray-400" /> Priority
+                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            <Flag size={16} className="text-slate-400" /> Priority
                                         </div>
                                         <select
                                             value={priority}
@@ -528,56 +824,70 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                         </select>
                                     </div>
                                     <div className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            <Hash size={16} className="text-gray-400" /> Story Points
+                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            <Hash size={16} className="text-slate-400" /> Story Points
                                         </div>
                                         <input
                                             type="number"
-                                            className="text-sm font-bold bg-gray-100 dark:bg-slate-800 border-none rounded-lg w-16 text-center py-1 outline-none focus:ring-2 focus:ring-blue-500/20 text-gray-800 dark:text-gray-200"
+                                            className="text-sm font-bold bg-slate-100 dark:bg-slate-800 border-none rounded-lg w-16 text-center py-1 outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-800 dark:text-slate-200"
                                             placeholder="-"
                                             value={storyPoints}
                                             onChange={e => setStoryPoints(e.target.value)}
                                         />
                                     </div>
                                     <div className="flex items-center justify-between group">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            <User size={16} className="text-gray-400" /> Assignee
+                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            <User size={16} className="text-slate-400" /> Assignee
                                         </div>
                                         <select
                                             value={assigneeId}
                                             onChange={(e) => setAssigneeId(e.target.value)}
-                                            className="bg-transparent text-sm font-medium outline-none text-right cursor-pointer hover:bg-gray-200 dark:hover:bg-slate-700/50 rounded px-2 py-1 w-40 truncate text-gray-800 dark:text-gray-200 transition-colors"
+                                            className="bg-transparent text-sm font-medium outline-none text-right cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700/50 rounded px-2 py-1 w-40 truncate text-slate-800 dark:text-slate-200 transition-colors"
                                         >
                                             <option value="">Unassigned</option>
                                             {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                         </select>
                                     </div>
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            <User size={16} className="text-gray-400" /> Reporter
+                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            <User size={16} className="text-slate-400" /> Reporter
                                         </div>
-                                        <span className="text-sm font-medium text-gray-800 dark:text-gray-200 px-2 py-1">
+                                        <span className="text-sm font-medium text-slate-800 dark:text-slate-200 px-2 py-1">
                                             {task?.reporter?.name || 'Unknown'}
                                         </span>
                                     </div>
-                                    <div className="flex items-center justify-between pt-2 border-t border-dashed border-gray-200 dark:border-slate-700">
-                                        <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
-                                            <Calendar size={16} className="text-gray-400" /> Due Date
+                                    <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            <Calendar size={16} className="text-slate-400" /> Due Date
                                         </div>
                                         <input
                                             type="date"
-                                            className="text-sm bg-transparent outline-none text-right cursor-pointer font-medium text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+                                            className="text-sm bg-transparent outline-none text-right cursor-pointer font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-2 py-1 transition-colors"
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
                                         />
                                     </div>
 
                                     <div className="pt-6">
-                                        <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Labels</label>
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Fix Version/Release</label>
+                                        <select
+                                            className="w-full text-sm p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
+                                            value={fixVersion}
+                                            onChange={e => setFixVersion(e.target.value)}
+                                        >
+                                            <option value="">No Version</option>
+                                            {releases.filter(r => r.status !== 'Archived').map(r => (
+                                                <option key={r.id} value={r.name}>{r.name} ({r.status})</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="pt-6">
+                                        <label className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 block">Labels</label>
                                         <input
                                             type="text"
                                             placeholder="e.g. Bug, Frontend"
-                                            className="w-full text-sm p-3 border border-gray-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
+                                            className="w-full text-sm p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 outline-none focus:ring-2 focus:ring-blue-500/20 transition-all shadow-sm"
                                             value={labels}
                                             onChange={e => setLabels(e.target.value)}
                                         />
@@ -585,7 +895,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
 
                                     <div className="pt-6">
                                         <div className="flex items-center justify-between mb-2">
-                                            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">Time Tracking</label>
+                                            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Time Tracking</label>
                                             <button
                                                 onClick={() => setIsTracking(!isTracking)}
                                                 className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${isTracking
@@ -603,11 +913,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                         <div className="space-y-3">
                                             {originalEstimate > 0 && (
                                                 <div className="mb-2">
-                                                    <div className="flex justify-between text-xs mb-1 text-gray-500 font-medium">
+                                                    <div className="flex justify-between text-xs mb-1 text-slate-500 font-medium">
                                                         <span>Progress</span>
                                                         <span>{Math.round((parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%</span>
                                                     </div>
-                                                    <div className="w-full bg-gray-200 rounded-full h-2 dark:bg-gray-700 overflow-hidden">
+                                                    <div className="w-full bg-slate-200 rounded-full h-2 dark:bg-slate-700 overflow-hidden">
                                                         <div
                                                             className={`h-full rounded-full transition-all duration-500 ${parseInt(timeSpent) > parseInt(originalEstimate) ? 'bg-red-500' : 'bg-blue-500'}`}
                                                             style={{ width: `${Math.min(100, (parseInt(timeSpent || 0) / parseInt(originalEstimate)) * 100)}%` }}
@@ -617,11 +927,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                             )}
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div>
-                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Estimated</label>
+                                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Estimated</label>
                                                     <input
                                                         type="text"
                                                         placeholder="e.g. 2w 4d 6h"
-                                                        className="w-full text-sm p-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-gray-700 dark:text-gray-200"
+                                                        className="w-full text-sm p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-slate-700 dark:text-slate-200"
                                                         value={estInput}
                                                         onChange={e => setEstInput(e.target.value)}
                                                         onBlur={() => {
@@ -632,11 +942,11 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] uppercase font-bold text-gray-400 mb-1 block">Time Spent</label>
+                                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Time Spent</label>
                                                     <input
                                                         type="text"
                                                         placeholder="e.g. 4h 30m"
-                                                        className="w-full text-sm p-2.5 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-gray-700 dark:text-gray-200"
+                                                        className="w-full text-sm p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-medium text-slate-700 dark:text-slate-200"
                                                         value={spentInput}
                                                         onChange={e => setSpentInput(e.target.value)}
                                                         onBlur={() => {
@@ -647,9 +957,9 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                                     />
                                                 </div>
                                             </div>
-                                            <div className="bg-gray-50 dark:bg-slate-800/50 p-3 rounded-lg border border-gray-100 dark:border-slate-700 flex justify-between items-center">
-                                                <span className="text-xs font-bold text-gray-500">Remaining</span>
-                                                <span className={`text-sm font-bold font-mono ${parseInt(originalEstimate || 0) - parseInt(timeSpent || 0) < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                                            <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                                                <span className="text-xs font-bold text-slate-500">Remaining</span>
+                                                <span className={`text-sm font-bold font-mono ${parseInt(originalEstimate || 0) - parseInt(timeSpent || 0) < 0 ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
                                                     {formatTime(Math.max(0, parseInt(originalEstimate || 0) - parseInt(timeSpent || 0)))}
                                                     {parseInt(originalEstimate || 0) - parseInt(timeSpent || 0) < 0 && <span className="text-xs ml-1 font-sans text-red-500">(Overdue)</span>}
                                                 </span>
@@ -659,7 +969,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                 </div>
                             </div>
 
-                            <div className="pt-6 border-t border-gray-200 dark:border-slate-700 mt-auto">
+                            <div className="pt-6 border-t border-slate-200 dark:border-slate-700 mt-auto">
                                 <button
                                     onClick={handleSubmit}
                                     disabled={isLoading}
@@ -676,7 +986,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 export default TaskModal;

@@ -14,9 +14,9 @@ export default function Footer() {
     const currentYear = new Date().getFullYear();
 
     return (
-        <footer className="relative w-full bg-white dark:bg-dark-bg border-t border-slate-200 dark:border-dark-border pt-16 pb-8 transition-colors duration-300">
+        <footer className="relative w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pt-16 pb-8 transition-colors duration-300">
             {/* Decorative Gradient Blob */}
-            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-primary-500/50 to-transparent opacity-50" />
+            <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent opacity-50" />
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-12 mb-16">
@@ -24,8 +24,8 @@ export default function Footer() {
                     {/* Brand Column */}
                     <div className="lg:col-span-2 space-y-6">
                         <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-xl tracking-tight">
-                            <div className="p-2 bg-primary-500/10 rounded-lg">
-                                <Command className="w-6 h-6 text-primary-500" />
+                            <div className="p-2 bg-blue-500/10 rounded-lg">
+                                <Command className="w-6 h-6 text-blue-500" />
                             </div>
                             <span>Jira Clone</span>
                         </div>
@@ -71,11 +71,11 @@ export default function Footer() {
                             <input
                                 type="email"
                                 placeholder="Enter your email"
-                                className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-dark-surface border border-slate-200 dark:border-dark-border rounded-xl outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 text-sm transition-all text-slate-900 dark:text-white placeholder:text-slate-400"
+                                className="w-full pl-10 pr-12 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-800 rounded-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-sm transition-all text-slate-900 dark:text-white placeholder:text-slate-400"
                             />
                             <button
                                 type="submit"
-                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg transition-colors"
+                                className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
                                 aria-label="Subscribe"
                             >
                                 <ArrowRight className="w-4 h-4" />
@@ -85,7 +85,7 @@ export default function Footer() {
                 </div>
 
                 {/* Bottom Bar */}
-                <div className="pt-8 border-t border-slate-200 dark:border-dark-border flex flex-col md:flex-row justify-between items-center gap-4">
+                <div className="pt-8 border-t border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
                     <p className="text-slate-500 dark:text-slate-400 text-sm">
                         © {currentYear} Jira Clone. All rights reserved.
                     </p>
@@ -109,7 +109,7 @@ function SocialLink({ href, icon, label }) {
     return (
         <a
             href={href}
-            className="p-2 text-slate-500 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-500/10 rounded-lg transition-all duration-300 transform hover:-translate-y-1"
+            className="p-2 text-slate-500 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-all duration-300 transform hover:-translate-y-1"
             aria-label={label}
         >
             {icon}
@@ -122,7 +122,7 @@ function FooterLink({ href, children, isSmall = false }) {
         <li>
             <a
                 href={href}
-                className={`inline-flex items-center group text-slate-500 dark:text-slate-400 hover:text-primary-500 dark:hover:text-primary-400 transition-colors ${isSmall ? 'text-xs' : 'text-sm'}`}
+                className={`inline-flex items-center group text-slate-500 dark:text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors ${isSmall ? 'text-xs' : 'text-sm'}`}
             >
                 <span>{children}</span>
                 {!isSmall && (
