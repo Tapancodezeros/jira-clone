@@ -209,9 +209,13 @@ const Header = () => {
                 <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-700 mx-1"></div>
 
                 <div className="flex items-center gap-3 relative group cursor-pointer">
-                    <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
-                        {user?.name?.[0] || <User size={18} />}
-                    </div>
+                    {user?.avatar ? (
+                        <img src={user.avatar} alt="User" className="w-9 h-9 rounded-full object-cover shadow-md" />
+                    ) : (
+                        <div className="w-9 h-9 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold shadow-md">
+                            {user?.name?.[0] || <User size={18} />}
+                        </div>
+                    )}
                     <div className="hidden sm:block text-sm">
                         <div className="font-semibold text-slate-700 dark:text-slate-200 leading-tight">{user?.name || 'Guest'}</div>
                         <div className="text-xs text-slate-400">View Profile</div>

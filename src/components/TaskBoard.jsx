@@ -2,7 +2,6 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import api from '../utils/apiClient';
 import { useParams } from 'react-router-dom';
 import Header from './Header';
-import Footer from './Footer';
 import confetti from 'canvas-confetti';
 import { Plus, Trash2, Download } from 'lucide-react';
 import TaskModal from './TaskModal';
@@ -14,6 +13,7 @@ import ProjectSidebar from './ProjectSidebar';
 import ProjectSettings from './ProjectSettings';
 import Reports from './Reports';
 import Releases from './Releases';
+import Roadmap from './Roadmap';
 
 const TaskBoard = () => {
     const { id } = useParams();
@@ -181,6 +181,16 @@ const TaskBoard = () => {
 
                 {/* Main Content Area */}
                 <main className="flex-1 overflow-hidden relative flex flex-col">
+                    {/* View: ROADMAP */}
+                    {currentView === 'roadmap' && (
+                        <Roadmap
+                            tasks={tasks}
+                            project={project}
+                            onCreateEpic={() => { setSelectedTask({ issueType: 'Epic', projectId: id }); setIsModalOpen(true); }}
+                            onCreateTask={(preset) => { setSelectedTask({ projectId: id, ...preset }); setIsModalOpen(true); }}
+                        />
+                    )}
+
                     {/* View: BOARD */}
                     {currentView === 'board' && (
                         <div className="flex-1 flex flex-col overflow-hidden">

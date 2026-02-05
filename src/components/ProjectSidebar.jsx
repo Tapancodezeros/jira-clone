@@ -1,11 +1,12 @@
 import React from 'react';
-import { Layout, List, Settings, Plus, Box, PieChart } from 'lucide-react';
+import { Layout, List, Settings, Plus, Box, PieChart, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const ProjectSidebar = ({ project, currentView, onViewChange }) => {
     const navigate = useNavigate();
 
     const navItems = [
+        { id: 'roadmap', label: 'Roadmap', icon: Calendar },
         { id: 'board', label: 'Board', icon: Layout },
         { id: 'backlog', label: 'Backlog', icon: List },
         { id: 'reports', label: 'Reports', icon: PieChart },
@@ -30,7 +31,7 @@ const ProjectSidebar = ({ project, currentView, onViewChange }) => {
             <div className="flex-1 py-4 px-3 space-y-1">
                 {/* Planning Group */}
                 <div className="text-xs font-bold text-slate-400 uppercase tracking-wider px-3 mb-2 mt-2">Planning</div>
-                {navItems.filter(i => ['board', 'backlog'].includes(i.id)).map(item => (
+                {navItems.filter(i => ['roadmap', 'board', 'backlog'].includes(i.id)).map(item => (
                     <button
                         key={item.id}
                         onClick={() => onViewChange(item.id)}

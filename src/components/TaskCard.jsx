@@ -1,5 +1,5 @@
 import React from 'react';
-import { Edit2, Trash2, Calendar, Tag, CheckSquare, Bug, BookOpen, Zap, Hash } from 'lucide-react';
+import { Edit2, Trash2, Calendar, Tag, CheckSquare, Bug, BookOpen, Zap } from 'lucide-react';
 
 export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDragStart }) {
     return (
@@ -91,9 +91,13 @@ export default function TaskCard({ task, index, onClick, onEdit, onDelete, onDra
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium max-w-[60px] truncate">
                                 {task.assignee.name.split(' ')[0]}
                             </span>
-                            <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-[8px] font-bold shadow-sm ring-1 ring-white dark:ring-slate-800">
-                                {task.assignee.name[0]}
-                            </div>
+                            {task.assignee.avatar ? (
+                                <img src={task.assignee.avatar} alt={task.assignee.name} className="w-5 h-5 rounded-full object-cover shadow-sm ring-1 ring-white dark:ring-slate-800" />
+                            ) : (
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 text-white flex items-center justify-center text-[8px] font-bold shadow-sm ring-1 ring-white dark:ring-slate-800">
+                                    {task.assignee.name[0]}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 flex items-center justify-center shadow-sm border border-slate-200 dark:border-slate-700" title="Unassigned">

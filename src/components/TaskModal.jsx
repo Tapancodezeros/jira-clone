@@ -11,6 +11,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [status, setStatus] = useState('Todo');
     const [priority, setPriority] = useState('Medium');
     const [dueDate, setDueDate] = useState('');
+    const [startDate, setStartDate] = useState('');
     const [labels, setLabels] = useState('');
     const [issueType, setIssueType] = useState('Task');
     const [storyPoints, setStoryPoints] = useState('');
@@ -38,76 +39,52 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
     const [isSearchingLinks, setIsSearchingLinks] = useState(false);
 
     // Timer Logic
-    const [isTracking, setIsTracking] = useState(task && task.status !== 'Done');
-    const wasTrackingRef = React.useRef(false);
-    const lastTickRef = React.useRef(0);
+    const [isTracking, setIsTracking] = useState(false);
+    const [timerStartTime, setTimerStartTime] = useState(null);
 
     // Releases state for Fix Version
     const [releases, setReleases] = useState([]);
     const [fixVersion, setFixVersion] = useState('');
-
     const { showToast } = useToast();
 
-    // Timer Logic
+    // Initialize Timer State from Task
+    useEffect(() => {
+        if (task) {
+            if (task.timerStartTime) {
+                setIsTracking(true);
+                setTimerStartTime(task.timerStartTime);
+            } else {
+                setIsTracking(false);
+                setTimerStartTime(null);
+            }
+        }
+    }, [task]);
+
+    // Timer Ticker (Only for display updates)
     useEffect(() => {
         let interval;
-        if (isTracking) {
-            lastTickRef.current = Date.now();
-            interval = setInterval(() => {
-                setTimeSpent(prev => {
-                    const newVal = parseInt(prev || 0) + 1;
-                    setSpentInput(formatTime(newVal));
-                    return newVal;
-                });
-                lastTickRef.current = Date.now();
-            }, 60000); // Update every minute
+        if (isTracking && timerStartTime) {
+            const updateTicker = () => {
+                const start = new Date(timerStartTime).getTime();
+                const now = Date.now();
+                const diffMins = Math.floor((now - start) / 60000);
+
+                // Calculate total display time: stored timeSpent + current session
+                const baseTime = task.timeSpent || 0;
+                const totalMins = baseTime + diffMins;
+
+                setTimeSpent(totalMins);
+                setSpentInput(formatTime(totalMins));
+            };
+
+            updateTicker(); // Initial update
+            interval = setInterval(updateTicker, 10000); // Check every 10s
         }
+        return () => clearInterval(interval);
+    }, [isTracking, timerStartTime, task?.timeSpent]);
 
-        return () => {
-            clearInterval(interval);
-            // On stop, if partial minute > 1s, round up means add 1 minute
-            if (isTracking && lastTickRef.current) {
-                const elapsed = Date.now() - lastTickRef.current;
-                if (elapsed > 1000) { // threshold to ignore immediate toggles
-                    setTimeSpent(prev => {
-                        const newVal = parseInt(prev || 0) + 1;
-                        setSpentInput(formatTime(newVal));
-                        // Update ref to avoid double counting if this cleanup runs multiple times (though unlikely with [] dep not changing)
-                        lastTickRef.current = Date.now();
-                        return newVal;
-                    });
-                }
-            }
-        };
-    }, [isTracking]);
+    // Remove visibility logic as simpler backend-based wall-clock time is more robust
 
-    // Auto Start/Stop on System Lock/Visibility Change
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                if (isTracking) {
-                    wasTrackingRef.current = true;
-                    setIsTracking(false);
-                    // showToast({ msg: 'Timer paused (away)' });
-                }
-            } else {
-                if (wasTrackingRef.current) {
-                    setIsTracking(true);
-                    wasTrackingRef.current = false;
-                    showToast({ msg: 'Timer resumed' });
-                }
-            }
-        };
-
-        // Initial check
-        if (document.hidden && isTracking) {
-            wasTrackingRef.current = true;
-            setIsTracking(false);
-        }
-
-        document.addEventListener("visibilitychange", handleVisibilityChange);
-        return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, [isTracking]);
 
     useEffect(() => {
         const fetchUsers = async () => {
@@ -207,6 +184,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         setStatus(detailedTask.status || 'Todo');
                         setPriority(detailedTask.priority || 'Medium');
                         setDueDate(detailedTask.dueDate || '');
+                        setStartDate(detailedTask.startDate || '');
                         setLabels(Array.isArray(detailedTask.labels) ? detailedTask.labels.filter(l => !l.startsWith('v:')).join(', ') : '');
                         setIssueType(detailedTask.issueType || 'Task');
                         setStoryPoints(detailedTask.storyPoints || '');
@@ -214,7 +192,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                         setTimeSpent(detailedTask.timeSpent || '');
                         setEstInput(formatTime(detailedTask.originalEstimate || 0));
                         setSpentInput(formatTime(detailedTask.timeSpent || 0));
-
+                        setTimerStartTime(detailedTask.timerStartTime || null);
                         // Update releases/fixVersion if stored in labels
                         if (Array.isArray(detailedTask.labels)) {
                             const verLabel = detailedTask.labels.find(l => l.startsWith('v:'));
@@ -296,11 +274,13 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             const payload = {
                 title, description, projectId, assigneeId, status, priority,
                 dueDate: dueDate || null,
+                startDate: startDate || null,
                 labels: labelArray,
                 issueType,
                 storyPoints: storyPoints ? parseInt(storyPoints) : null,
                 originalEstimate: originalEstimate ? parseInt(originalEstimate) : null,
-                timeSpent: timeSpent ? parseInt(timeSpent) : 0
+                timeSpent: timeSpent ? parseInt(timeSpent) : 0,
+                parentTaskId: task?.parentTaskId || null
             };
             if (task && task.id) {
                 await api.put(`/tasks/${task.id}`, payload);
@@ -360,6 +340,39 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
             console.error(e);
         } finally {
             setIsSearchingLinks(false);
+        }
+    };
+    const handleToggleTimer = async () => {
+        if (!task) return;
+        try {
+            if (isTracking) {
+                // Stop Timer
+                const res = await api.post(`/tasks/${task.id}/timer/stop`);
+                if (res && res.success) {
+                    setIsTracking(false);
+                    setTimerStartTime(null);
+                    setTimeSpent(res.timeSpent);
+                    setSpentInput(formatTime(res.timeSpent));
+                    // Update task prop reference if possible or just rely on local state override
+                    // Ideally we should reload the task, but for now local update is faster
+                    if (task) {
+                        task.timeSpent = res.timeSpent;
+                        task.remainingEstimate = res.remainingEstimate;
+                    }
+                    showToast({ msg: `Timer stopped. Logged ${res.timeLogged}m.` });
+                }
+            } else {
+                // Start Timer
+                const res = await api.post(`/tasks/${task.id}/timer/start`);
+                if (res && res.success) {
+                    setIsTracking(true);
+                    setTimerStartTime(res.timerStartTime);
+                    showToast({ msg: 'Timer started' });
+                }
+            }
+        } catch (err) {
+            console.error('Timer toggle failed', err);
+            showToast({ msg: err?.data?.message || 'Failed to toggle timer' });
         }
     };
 
@@ -741,9 +754,13 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     {comments.length === 0 && <p className="text-slate-400 text-sm text-center italic">No comments yet.</p>}
                                     {comments.map(c => (
                                         <div key={c.id} className="flex gap-4 group animate-in fade-in slide-in-from-bottom-2">
-                                            <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0 shadow-sm border border-indigo-200 dark:border-indigo-800">
-                                                {c.author?.name?.substring(0, 2)?.toUpperCase() || '??'}
-                                            </div>
+                                            {c.author?.avatar ? (
+                                                <img src={c.author.avatar} alt={c.author.name} className="w-9 h-9 rounded-full object-cover shadow-sm border border-indigo-200 dark:border-indigo-800 shrink-0" />
+                                            ) : (
+                                                <div className="w-9 h-9 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-bold text-xs shrink-0 shadow-sm border border-indigo-200 dark:border-indigo-800">
+                                                    {c.author?.name?.substring(0, 2)?.toUpperCase() || '??'}
+                                                </div>
+                                            )}
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1.5">
                                                     <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{c.author?.name || 'Unknown'}</span>
@@ -858,6 +875,17 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                     </div>
                                     <div className="flex items-center justify-between pt-2 border-t border-dashed border-slate-200 dark:border-slate-700">
                                         <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
+                                            <Calendar size={16} className="text-slate-400" /> Start Date
+                                        </div>
+                                        <input
+                                            type="date"
+                                            className="text-sm bg-transparent outline-none text-right cursor-pointer font-medium text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded px-2 py-1 transition-colors"
+                                            value={startDate}
+                                            onChange={e => setStartDate(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-400">
                                             <Calendar size={16} className="text-slate-400" /> Due Date
                                         </div>
                                         <input
@@ -897,7 +925,7 @@ const TaskModal = ({ task, projectId, onClose, onSave, onDelete }) => {
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Time Tracking</label>
                                             <button
-                                                onClick={() => setIsTracking(!isTracking)}
+                                                onClick={handleToggleTimer}
                                                 className={`flex items-center gap-2 px-3 py-1 rounded-lg text-xs font-bold transition-all ${isTracking
                                                     ? 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-100 animate-pulse'
                                                     : 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400 hover:bg-green-100'
